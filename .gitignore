@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+venv/
+.venv/
+
+# Database & data files
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# macOS
+.DS_Store
+
+# PyInstaller build artefacts
+build/
+dist/
+*.spec.bak
+
+# Backup files
+*.backup
+config.py.backup
