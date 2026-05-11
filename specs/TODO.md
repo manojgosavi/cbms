@@ -30,3 +30,5 @@
   The Container column value is the Box name for respective Shelf, Rack and Drawer for freezer type 1 and 2. For freezer 3 and 4 there are no shelves and drawers.
 
 - ~~Implement previous change to existing data imported from excel~~ ✓ done (run: python migrate_storage.py)
+- ~~In Storage tab, in the box grid, can you adjust font so that it doesn't go outside the cell.~~ ✓ done
+- ~~In Participant tab, & in general all tabs, sometime columns width are too large, can you adjust it.~~ ✓ done

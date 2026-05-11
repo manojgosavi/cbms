@@ -39,7 +39,7 @@ from PyQt6.QtCore import (
     QMimeData, QPoint, QRect, QSize, Qt, pyqtSignal
 )
 from PyQt6.QtGui import (
-    QBrush, QColor, QDrag, QFont, QPainter, QPen, QPixmap
+    QBrush, QColor, QDrag, QFont, QFontMetrics, QPainter, QPen, QPixmap
 )
 from PyQt6.QtWidgets import QSizePolicy, QToolTip, QWidget
 
@@ -182,9 +182,6 @@ class BoxGridWidget(QWidget):
 
         font_small = QFont()
         font_small.setPointSize(8)
-        font_label = QFont()
-        font_label.setPointSize(10)
-        font_label.setBold(True)
 
         # ── Draw column headers (A, B, C...) ──────────────────────────────
         painter.setFont(font_small)
@@ -239,24 +236,37 @@ class BoxGridWidget(QWidget):
 
                 # Draw label text inside occupied cells
                 if cell and cell.aliquot_label:
-                    painter.setFont(font_label)
-                    text_color = (COLOR_TEXT_DARK
-                                  if fill in (COLOR_EMPTY, COLOR_HOVER)
-                                  else COLOR_TEXT)
-                    painter.setPen(QPen(text_color))
-
-                    # Clip text to cell (truncate if too long)
                     inner = rect.adjusted(
                         self.CELL_PADDING, self.CELL_PADDING,
                         -self.CELL_PADDING, -self.CELL_PADDING
                     )
-                    painter.drawText(
-                        inner,
-                        Qt.AlignmentFlag.AlignCenter,
-                        cell.aliquot_label,
-                    )
+                    text_color = (COLOR_TEXT_DARK
+                                  if fill in (COLOR_EMPTY, COLOR_HOVER)
+                                  else COLOR_TEXT)
+                    painter.setPen(QPen(text_color))
+                    self._draw_fitted_label(painter, inner, cell.aliquot_label)
 
         painter.end()
+
+    def _draw_fitted_label(self, painter: QPainter, rect: QRect, text: str) -> None:
+        """Draw text inside rect, shrinking font until it fits, then elide."""
+        for pt in (10, 8, 7, 6):
+            font = QFont()
+            font.setPointSize(pt)
+            font.setBold(pt >= 8)
+            fm = QFontMetrics(font)
+            if fm.horizontalAdvance(text) <= rect.width():
+                painter.setFont(font)
+                painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, text)
+                return
+        # Minimum size — elide if still overflowing
+        font = QFont()
+        font.setPointSize(6)
+        font.setBold(False)
+        painter.setFont(font)
+        fm = QFontMetrics(font)
+        elided = fm.elidedText(text, Qt.TextElideMode.ElideRight, rect.width())
+        painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, elided)
 
     # ── Mouse events ───────────────────────────────────────────────────────
 
