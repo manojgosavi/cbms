@@ -163,7 +163,7 @@ class SearchTab(QWidget):
 
         header = self._table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(18, QHeaderView.ResizeMode.Stretch)  # Discrepancy
 
         right_layout.addWidget(self._table)
 

@@ -83,9 +83,8 @@ class ParticipantTab(QWidget):
         self._table.setAlternatingRowColors(True)
 
         header = self._table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(9, QHeaderView.ResizeMode.Stretch)  # Notes
 
         self._table.verticalHeader().setVisible(False)
         self._table.itemSelectionChanged.connect(
