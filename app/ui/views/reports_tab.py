@@ -15,11 +15,12 @@ from typing import List, Optional
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QFileDialog, QGroupBox,
-    QHBoxLayout, QHeaderView, QLabel, QMessageBox,
+    QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox,
     QPushButton, QSplitter, QTableWidget,
     QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
+from app.config import CohortName, Gender, Site, SampleType
 from app.core.models.database import get_session
 from app.core.services.catalogue_service import CatalogueRow, CatalogueService
 from app.core.services.study_service import StudyService
@@ -37,7 +38,7 @@ class ReportsTab(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
 
-        # ── Filter bar ─────────────────────────────────────────────────────
+        # ── Primary filter bar ─────────────────────────────────────────────
         filter_box = QGroupBox("Catalogue filters")
         fl = QHBoxLayout(filter_box)
 
@@ -46,13 +47,13 @@ class ReportsTab(QWidget):
         self._load_studies()
 
         self._available_only = QCheckBox("Available aliquots only")
-        self._available_only.setChecked(False)  # Default: show ALL aliquots (including shipped/blocked)
+        self._available_only.setChecked(False)
 
         btn_generate = QPushButton("Generate Catalogue")
         btn_generate.clicked.connect(self._on_generate)
-        
+
         btn_refresh = QPushButton("🔄 Refresh")
-        btn_refresh.clicked.connect(self._on_generate)  # Refresh = regenerate with same filters
+        btn_refresh.clicked.connect(self._on_generate)
 
         self._btn_export = QPushButton("Export to Excel…")
         self._btn_export.setEnabled(False)
@@ -66,6 +67,70 @@ class ReportsTab(QWidget):
         fl.addWidget(btn_refresh)
         fl.addWidget(self._btn_export)
         layout.addWidget(filter_box)
+
+        # ── Narrow results filter panel ────────────────────────────────────
+        narrow_box = QGroupBox("Narrow results")
+        nl = QVBoxLayout(narrow_box)
+
+        row1 = QHBoxLayout()
+        row2 = QHBoxLayout()
+
+        # PID
+        self._f_pid = QLineEdit()
+        self._f_pid.setPlaceholderText("partial match")
+        self._f_pid.setMaximumWidth(140)
+
+        # Gender
+        self._f_gender = QComboBox()
+        self._f_gender.addItem("All genders", None)
+        for g in Gender:
+            self._f_gender.addItem(g.value, g.value)
+
+        # Disease
+        self._f_disease = QLineEdit()
+        self._f_disease.setPlaceholderText("partial match")
+        self._f_disease.setMaximumWidth(160)
+
+        # Cohort
+        self._f_cohort = QComboBox()
+        self._f_cohort.addItem("All cohorts", None)
+        for c in CohortName:
+            self._f_cohort.addItem(c.value, c.value)
+
+        # Site
+        self._f_site = QComboBox()
+        self._f_site.addItem("All sites", None)
+        for s in Site:
+            self._f_site.addItem(s.value, s.value)
+
+        # Sample Type (column filter)
+        self._f_stype = QComboBox()
+        self._f_stype.addItem("All sample types", None)
+        for st in SampleType:
+            self._f_stype.addItem(st.value, st.value)
+
+        btn_clear = QPushButton("Clear filters")
+        btn_clear.clicked.connect(self._on_clear_filters)
+
+        row1.addWidget(QLabel("PID:"));     row1.addWidget(self._f_pid)
+        row1.addSpacing(12)
+        row1.addWidget(QLabel("Gender:"));  row1.addWidget(self._f_gender)
+        row1.addSpacing(12)
+        row1.addWidget(QLabel("Disease:")); row1.addWidget(self._f_disease)
+        row1.addStretch()
+
+        row2.addWidget(QLabel("Cohort:"));       row2.addWidget(self._f_cohort)
+        row2.addSpacing(12)
+        row2.addWidget(QLabel("Site:"));         row2.addWidget(self._f_site)
+        row2.addSpacing(12)
+        row2.addWidget(QLabel("Sample Type:"));  row2.addWidget(self._f_stype)
+        row2.addSpacing(12)
+        row2.addWidget(btn_clear)
+        row2.addStretch()
+
+        nl.addLayout(row1)
+        nl.addLayout(row2)
+        layout.addWidget(narrow_box)
 
         # ── Summary label ──────────────────────────────────────────────────
         self._summary_lbl = QLabel("Click 'Generate Catalogue' to build the pivot table.")
@@ -94,9 +159,32 @@ class ReportsTab(QWidget):
 
         with get_session() as session:
             svc = CatalogueService(session)
-            self._rows, self._col_headers = svc.generate(
-                study_id=study_id, available_only=avail
-            )
+            rows, col_headers = svc.generate(study_id=study_id, available_only=avail)
+
+        # ── Post-query filters ─────────────────────────────────────────────
+        pid_q     = self._f_pid.text().strip().lower()
+        gender_q  = self._f_gender.currentData()
+        disease_q = self._f_disease.text().strip().lower()
+        cohort_q  = self._f_cohort.currentData()
+        site_q    = self._f_site.currentData()
+        stype_q   = self._f_stype.currentData()
+
+        def _matches(row: CatalogueRow) -> bool:
+            if pid_q     and pid_q not in row.pid.lower():                 return False
+            if gender_q  and row.gender != gender_q:                       return False
+            if disease_q and disease_q not in (row.disease or "").lower(): return False
+            if cohort_q  and row.cohort_name != cohort_q:                  return False
+            if site_q    and row.site_name != site_q:                      return False
+            return True
+
+        rows = [r for r in rows if _matches(r)]
+
+        if stype_q:
+            col_headers = [c for c in col_headers if c == stype_q]
+            for r in rows:
+                r.sample_counts = {k: v for k, v in r.sample_counts.items() if k == stype_q}
+
+        self._rows, self._col_headers = rows, col_headers
 
         if not self._rows:
             self._summary_lbl.setText("No data found for selected filters.")
@@ -105,8 +193,8 @@ class ReportsTab(QWidget):
             return
 
         # ── Populate pivot table ───────────────────────────────────────────
-        demo_cols    = ["PID", "Study", "Age", "Gender", "Disease", "Cohort", "Site", "Total"]
-        all_cols     = demo_cols + self._col_headers
+        demo_cols = ["PID", "Study", "Age", "Gender", "Disease", "Cohort", "Site", "Total"]
+        all_cols  = demo_cols + self._col_headers
 
         self._table.setColumnCount(len(all_cols))
         self._table.setHorizontalHeaderLabels(all_cols)
@@ -122,8 +210,7 @@ class ReportsTab(QWidget):
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self._table.setItem(row_idx, col_idx, item)
 
-            for col_idx, stype in enumerate(self._col_headers,
-                                             start=len(demo_cols)):
+            for col_idx, stype in enumerate(self._col_headers, start=len(demo_cols)):
                 count = row.sample_counts.get(stype, 0)
                 item  = QTableWidgetItem(str(count) if count else "")
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -133,12 +220,21 @@ class ReportsTab(QWidget):
                 self._table.setItem(row_idx, col_idx, item)
 
         total_aliquots = sum(r.total_aliquots for r in self._rows)
+        filter_note = " [filtered]" if any([pid_q, gender_q, disease_q, cohort_q, site_q, stype_q]) else ""
         self._summary_lbl.setText(
             f"{len(self._rows)} participant(s)  |  "
             f"{len(self._col_headers)} sample type(s)  |  "
-            f"{total_aliquots} total aliquots"
+            f"{total_aliquots} total aliquots{filter_note}"
         )
         self._btn_export.setEnabled(True)
+
+    def _on_clear_filters(self):
+        self._f_pid.clear()
+        self._f_gender.setCurrentIndex(0)
+        self._f_disease.clear()
+        self._f_cohort.setCurrentIndex(0)
+        self._f_site.setCurrentIndex(0)
+        self._f_stype.setCurrentIndex(0)
 
     def _on_export(self):
         if not self._rows:
