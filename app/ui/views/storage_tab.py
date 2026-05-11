@@ -44,7 +44,7 @@ class StorageTab(QWidget):
         tree_toolbar = QHBoxLayout()
         btn_refresh         = QPushButton("🔄 Refresh")
         btn_new_freezer     = QPushButton("＋ Freezer")
-        btn_new_compartment = QPushButton("＋ Compartment")
+        btn_new_compartment = QPushButton("＋ Shelf")
         btn_new_rack        = QPushButton("＋ Rack")
         btn_new_drawer      = QPushButton("＋ Drawer")
         btn_new_box         = QPushButton("＋ Box")
@@ -203,9 +203,9 @@ class StorageTab(QWidget):
             f_item.setExpanded(True)
 
             for comp_id, comp_name, racks in comps:
-                # Level 2: Compartment
+                # Level 2: Shelf
                 comp_item = QTreeWidgetItem(f_item)
-                comp_item.setText(0, f"🔲  {comp_name}")
+                comp_item.setText(0, f"📋  {comp_name}")
                 comp_item.setData(0, Qt.ItemDataRole.UserRole, ("compartment", comp_id))
                 comp_item.setExpanded(True)
 
@@ -519,7 +519,12 @@ class StorageTab(QWidget):
                     svc.delete_box(item_id)
                 
                 self.refresh()
-                QMessageBox.information(self, "Success", f"{item_type.capitalize()} deleted successfully.")
+                _TYPE_LABELS = {
+                    "freezer": "Freezer", "compartment": "Shelf",
+                    "rack": "Rack", "drawer": "Drawer", "box": "Box",
+                }
+                label = _TYPE_LABELS.get(item_type, item_type.capitalize())
+                QMessageBox.information(self, "Success", f"{label} deleted successfully.")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to delete {item_type}: {str(e)}")
 

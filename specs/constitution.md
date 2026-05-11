@@ -338,3 +338,4 @@ These are acknowledged deficiencies, not bugs to hotfix:
 | 2026-05-11 | G4 resolved: Catalogue tab gains PID, Gender, Disease, Cohort, Site, Sample Type filters | Claude Code |
 | 2026-05-11 | Dashboard: matplotlib charts replaced with cohort flowchart (QTableWidget) | Claude Code |
 | 2026-05-11 | Dashboard v2: QPainter flowchart, single-cohort selector, styled colour scheme | Claude Code |
+| 2026-05-11 | Storage hierarchy fix: Container→Box, Shelf→Compartment, cylindrical freezer path | Claude Code |
