@@ -200,25 +200,22 @@ class SampleTab(QWidget):
         self._load_samples(participant_id)
 
     def _load_samples(self, participant_id: int):
-        """Load all samples for the participant, grouped by visit."""
+        """Load all samples for the participant, grouped by visit code."""
         self._visit_list.clear()
         self._sample_tree.clear()
-        self._current_visit_filter = None  # Reset filter when loading new participant
+        self._current_visit_filter = None
 
         with get_session() as session:
             svc = SampleService(session)
             samples = svc.get_samples_for_participant(participant_id)
 
-            # Group by visit name (or "No Visit" if none)
             visits: dict[str, list] = {}
             sample_data = []
-            
-            print(f"\n[DEBUG _load_samples] PID {participant_id}: Total samples from DB: {len(samples)}")
-            
+
             for s in samples:
-                visit_name = s.visit_name or "No Visit"
-                if visit_name not in visits:
-                    visits[visit_name] = []
+                visit_key = s.visit_code or "No Visit"
+                if visit_key not in visits:
+                    visits[visit_key] = []
 
                 aliquot_data = []
                 for a in s.aliquots:
@@ -236,9 +233,7 @@ class SampleTab(QWidget):
                         a.id,
                     ))
 
-                visits[visit_name].append(s.sample_id)
-                print(f"  [DEBUG] Added sample_id={s.sample_id}, visit='{visit_name}', visits[{visit_name}]={visits[visit_name]}")
-                
+                visits[visit_key].append(s.sample_id)
                 sample_data.append((
                     s.sample_id,
                     s.sample_type,
@@ -248,42 +243,32 @@ class SampleTab(QWidget):
                     "",
                     s.id,
                     aliquot_data,
-                    visit_name,  # ADD visit_name at index 8 for filtering
+                    visit_key,  # visit_code stored at index 8 for filtering
                 ))
-            
-            print(f"[DEBUG] After loop: visits={visits}, sample_data count={len(sample_data)}")
 
-            # Cache all sample data (while session is still open)
             self._all_sample_data = sample_data.copy()
-            
-            # Store visits dict for later use
             self._visits_dict = visits.copy()
 
-        # Now that session is closed, populate UI using cached data
-        # Populate visit list
-        for visit_name in self._visits_dict:
+        # Populate visit list (insertion order preserved — dict is ordered in Python 3.7+)
+        for visit_key in self._visits_dict:
             visit_item = QTreeWidgetItem(self._visit_list)
-            visit_item.setText(0, visit_name)
-            visit_item.setData(0, Qt.ItemDataRole.UserRole, visit_name)
-            
-            # Add sample IDs as children of each visit
-            for sample_id in self._visits_dict[visit_name]:
+            visit_item.setText(0, visit_key)
+            visit_item.setData(0, Qt.ItemDataRole.UserRole, visit_key)
+
+            for sample_id in self._visits_dict[visit_key]:
                 sample_item = QTreeWidgetItem(visit_item)
                 sample_item.setText(0, f"  {sample_id}")
         self._visit_list.expandAll()
 
-        # Populate sample tree with ALL samples initially
         self._render_sample_tree(self._all_sample_data)
 
     # ── Event handlers ─────────────────────────────────────────────────────
 
     def _render_sample_tree(self, sample_data: list):
-        """Render samples in the tree. Can be ALL samples or filtered by visit."""
+        """Render samples in the tree. Can be ALL samples or filtered by visit code."""
         self._sample_tree.clear()
-        
-        print(f"[DEBUG _render_sample_tree] Rendering {len(sample_data)} samples")
-        for s_id, s_type, s_date, _, s_count, _, db_id, aliquots, visit_name in sample_data:
-            print(f"  [DEBUG TREE] Adding sample_id={s_id}, type={s_type}, visit={visit_name}")
+
+        for s_id, s_type, s_date, _, s_count, _, db_id, aliquots, visit_key in sample_data:
             sample_item = QTreeWidgetItem(self._sample_tree)
             sample_item.setText(0, s_id)
             sample_item.setText(1, s_type)
@@ -317,25 +302,15 @@ class SampleTab(QWidget):
         )
 
     def _on_visit_clicked(self, item, col):
-        """Filter sample tree when a visit is clicked in the left panel."""
-        visit_name = item.data(0, Qt.ItemDataRole.UserRole)
-        
-        # Only filter if clicking a top-level visit (not child sample items)
-        if visit_name is None or not isinstance(visit_name, str):
+        """Filter sample tree when a visit code node is clicked in the left panel."""
+        visit_key = item.data(0, Qt.ItemDataRole.UserRole)
+
+        # Only filter on top-level visit nodes (child sample-ID items have no UserRole data)
+        if visit_key is None or not isinstance(visit_key, str):
             return
-        
-        print(f"\n[DEBUG _on_visit_clicked] Clicked visit: '{visit_name}'")
-        self._current_visit_filter = visit_name
-        
-        # Filter samples to show only from this visit
-        filtered_samples = [
-            s for s in self._all_sample_data 
-            if s[8] == visit_name  # s[8] is the visit_name
-        ]
-        
-        print(f"[DEBUG] Filtered to {len(filtered_samples)} samples for visit '{visit_name}'")
-        
-        # Re-render the tree with filtered samples
+
+        self._current_visit_filter = visit_key
+        filtered_samples = [s for s in self._all_sample_data if s[8] == visit_key]
         self._render_sample_tree(filtered_samples)
 
     def _on_tree_selection_changed(self):
