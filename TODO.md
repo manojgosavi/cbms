@@ -6,6 +6,6 @@
 
 ## Next
 
-- In Sample tab, left hierarchy should be on basis of visit code not visit name.
+- ~~In Sample tab, left hierarchy should be on basis of visit code not visit name.~~ ✓ done
 - In Storage tab, After sample is shipped, the box color should change to grey.
 - In catalogue tab, add all the filters like search tab.
