@@ -352,8 +352,13 @@ class StorageTab(QWidget):
                 f"{position_label}\n{cell.tooltip or cell.aliquot_label}"
             )
             self._btn_place.setEnabled(False)
-            self._btn_move.setEnabled(True)
-            self._btn_remove.setEnabled(True)
+            # Shipped aliquot is physically gone — lock both action buttons
+            if cell.is_shipped:
+                self._btn_move.setEnabled(False)
+                self._btn_remove.setEnabled(False)
+            else:
+                self._btn_move.setEnabled(True)
+                self._btn_remove.setEnabled(True)
         else:
             self._cell_detail.setText(f"{position_label} — Empty")
             self._btn_place.setEnabled(True)

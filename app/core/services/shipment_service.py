@@ -3,7 +3,7 @@ Shipment Service — ship blocked aliquots to a researcher.
 
 Business rules:
   - Only blocked aliquots can be shipped (must be reserved first)
-  - After shipment, aliquot is removed from its storage location automatically
+  - After shipment, the aliquot's location is preserved for grid history; the cell renders grey
   - Full shipment history is maintained
   - Shipment ref is auto-generated: SHIP-YYYYMMDD-NNN
 """
@@ -16,7 +16,7 @@ from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 
 from app.core.models.models import (
-    AliquotLocation, SampleAliquot, SampleBlock, Shipment, ShipmentItem
+    SampleAliquot, SampleBlock, Shipment, ShipmentItem
 )
 from app.core.services.audit_service import log
 from app.core.services.auth_service import app_session
@@ -105,15 +105,6 @@ class ShipmentService:
             aliquot.is_blocked   = False
             aliquot.is_available = False
             self.session.add(aliquot)
-
-            # Remove from storage location (scope doc: "automatically removed from location")
-            loc = (
-                self.session.query(AliquotLocation)
-                .filter(AliquotLocation.aliquot_id == aid)
-                .first()
-            )
-            if loc:
-                self.session.delete(loc)
 
             # Release the block record
             block = (
