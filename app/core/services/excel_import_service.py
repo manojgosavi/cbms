@@ -29,11 +29,15 @@ from app.core.models.models import (
 from app.core.services.id_generator import generate_sample_id, generate_aliquot_id
 from app.core.repositories.storage_repository import FreezerRepository
 
-# Valid shelf and rack names
-VALID_SHELVES = ["I", "II", "III", "IV"]
-VALID_RACKS = ["A", "B", "C", "D", "E", "F"]
-VALID_DRAWERS = ["01", "02", "03", "04", "05"]
-VALID_BOXES = ["Box-1", "Box-2", "Box-3", "Box-4", "Box-5"]
+# Valid hierarchy values for upright freezers (Freezer 1 & 2)
+VALID_SHELVES  = ["I", "II", "III", "IV"]
+VALID_RACKS    = ["A", "B", "C", "D", "E", "F"]
+VALID_DRAWERS  = ["01", "02", "03", "04", "05"]
+
+# Cylindrical freezers (Freezer 3 & 4): racks 01-13, no shelf or drawer
+VALID_CYLINDRICAL_RACKS           = [f"{i:02d}" for i in range(1, 14)]
+CYLINDRICAL_SENTINEL_COMPARTMENT  = "CYLINDRICAL"
+CYLINDRICAL_SENTINEL_DRAWER       = "01"
 
 
 @dataclass
@@ -236,52 +240,76 @@ class ExcelImportService:
                 errors.append(f"Date Collected must be YYYY-MM-DD format, got '{row.date_collected}'")
 
         # Storage hierarchy validation
-        storage_fields = [row.freezer_name, row.container_name, row.shelf_name,
-                         row.rack_drawer_combined, row.slot_position]
-        has_storage = any(storage_fields)
+        has_storage = any([row.freezer_name, row.container_name, row.shelf_name,
+                           row.rack_drawer_combined, row.slot_position])
 
         if has_storage:
-            if not all(storage_fields):
-                missing = []
-                if not row.freezer_name: missing.append("Freezer / Tank")
-                if not row.container_name: missing.append("Container")
-                if not row.shelf_name: missing.append("Shelf")
-                if not row.rack_drawer_combined: missing.append("Rack")
-                if not row.slot_position: missing.append("Slot Position")
+            # Core fields required for both upright and cylindrical paths
+            missing = []
+            if not row.freezer_name:        missing.append("Freezer / Tank")
+            if not row.container_name:      missing.append("Container")
+            if not row.rack_drawer_combined: missing.append("Rack")
+            if not row.slot_position:       missing.append("Slot Position")
+            if missing:
                 errors.append(f"Storage incomplete. Missing: {', '.join(missing)}")
             else:
-                # Validate Shelf
-                row.shelf_name = str(row.shelf_name).strip()
-                if row.shelf_name not in VALID_SHELVES:
-                    errors.append(f"Invalid Shelf '{row.shelf_name}'. Allowed: {VALID_SHELVES}")
+                is_cylindrical = not row.shelf_name  # no shelf → cylindrical freezer
 
-                # Validate and parse Rack-Drawer combined field
-                rack_drawer = str(row.rack_drawer_combined).strip()
-                rack_drawer_parts = rack_drawer.split('-')
-                if len(rack_drawer_parts) != 2:
-                    errors.append(f"Rack format invalid '{rack_drawer}'. Expected format: 'A-01' (Rack-Drawer)")
+                if is_cylindrical:
+                    # Cylindrical path: rack is a plain number 01-13
+                    rack_str = str(row.rack_drawer_combined).strip()
+                    try:
+                        rack_str = f"{int(rack_str):02d}"
+                        if rack_str not in VALID_CYLINDRICAL_RACKS:
+                            errors.append(
+                                f"Cylindrical rack must be 01–13, got '{rack_str}'"
+                            )
+                        else:
+                            row.rack_drawer_combined = rack_str
+                    except (ValueError, TypeError):
+                        errors.append(
+                            f"Cylindrical rack must be a number 1–13, got '{rack_str}'"
+                        )
                 else:
-                    rack_name = rack_drawer_parts[0].upper()
-                    drawer_name = rack_drawer_parts[1].strip()
-                    
-                    if rack_name not in VALID_RACKS:
-                        errors.append(f"Invalid Rack '{rack_name}'. Allowed: {VALID_RACKS}")
-                    if drawer_name not in VALID_DRAWERS:
-                        errors.append(f"Invalid Drawer '{drawer_name}'. Allowed: {VALID_DRAWERS}")
-                    
-                    # Store parsed values back
-                    row.rack_drawer_combined = f"{rack_name}-{drawer_name}"
+                    # Upright path: validate shelf and rack-drawer format
+                    row.shelf_name = str(row.shelf_name).strip()
+                    if row.shelf_name not in VALID_SHELVES:
+                        errors.append(
+                            f"Invalid Shelf '{row.shelf_name}'. Allowed: {VALID_SHELVES}"
+                        )
 
-                # Validate Slot Position (1-100) and convert to letter+number format
+                    rack_drawer = str(row.rack_drawer_combined).strip()
+                    parts = rack_drawer.split('-')
+                    if len(parts) != 2:
+                        errors.append(
+                            f"Rack format invalid '{rack_drawer}'. Expected: 'A-01'"
+                        )
+                    else:
+                        rack_name   = parts[0].upper()
+                        drawer_name = parts[1].strip()
+                        if rack_name not in VALID_RACKS:
+                            errors.append(
+                                f"Invalid Rack '{rack_name}'. Allowed: {VALID_RACKS}"
+                            )
+                        if drawer_name not in VALID_DRAWERS:
+                            errors.append(
+                                f"Invalid Drawer '{drawer_name}'. Allowed: {VALID_DRAWERS}"
+                            )
+                        row.rack_drawer_combined = f"{rack_name}-{drawer_name}"
+
+                # Slot position validation applies to both paths
                 try:
                     slot_pos = int(row.slot_position)
                     if slot_pos < 1 or slot_pos > 100:
-                        errors.append(f"Slot Position must be between 1 and 100, got '{slot_pos}'")
+                        errors.append(
+                            f"Slot Position must be 1–100, got '{slot_pos}'"
+                        )
                     else:
-                        # Convert sequential number to grid position (A1-J10)
                         row.position = self._convert_position_number_to_format(slot_pos)
                 except (ValueError, TypeError):
-                    errors.append(f"Slot Position must be a number, got '{row.slot_position}'")
+                    errors.append(
+                        f"Slot Position must be a number, got '{row.slot_position}'"
+                    )
 
         row.errors = errors
 
@@ -365,117 +393,136 @@ class ExcelImportService:
         shelf_name: str, rack_drawer_combined: str
     ) -> tuple[Freezer, Compartment, StorageRack, StorageDrawer, StorageBox]:
         """
-        Get or create the complete storage hierarchy.
-        Freezer → Container → Shelf → Rack → Drawer → Box-1 (default)
-        Returns tuple of (freezer, container, shelf, drawer, box).
-        Auto-creates fixed-count items (shelves, racks, drawers, boxes).
+        Upright freezer hierarchy (Freezer 1 & 2).
+
+        Correct column → DB level mapping:
+          shelf_name (col Q)       → Compartment  (I / II / III / IV)
+          rack_letter from col R   → StorageRack   (A / B / C / D / E / F)
+          drawer_number from col R → StorageDrawer (01 / 02 / 03 / 04 / 05)
+          container_name (col O)   → StorageBox    (actual box name)
         """
         freezer_repo = FreezerRepository(self.session)
-
-        # Parse Rack-Drawer combined field
         rack_letter, drawer_number = rack_drawer_combined.split('-')
 
-        # Get or create Freezer
+        # Freezer
         freezer = freezer_repo.get_by_name(freezer_name)
         if not freezer:
             freezer = Freezer(name=freezer_name)
             self.session.add(freezer)
             self.session.flush()
 
-        # Get or create Container (was Compartment)
-        container = next(
-            (c for c in freezer.compartments if c.name == container_name),
-            None
+        # Compartment = Shelf (I / II / III / IV)
+        compartment = next(
+            (c for c in freezer.compartments if c.name == shelf_name), None
         )
-        if not container:
-            container = Compartment(name=container_name, freezer_id=freezer.id)
-            self.session.add(container)
+        if not compartment:
+            compartment = Compartment(name=shelf_name, freezer_id=freezer.id)
+            self.session.add(compartment)
             self.session.flush()
-            
-            # Auto-create 4 Shelves when container is created
-            for shelf_val in VALID_SHELVES:
-                shelf = StorageRack(name=shelf_val, compartment_id=container.id)
-                self.session.add(shelf)
-            self.session.flush()
-
-        # Get the Shelf (StorageRack with shelf_name)
-        shelf = next(
-            (s for s in container.racks if s.name == shelf_name),
-            None
-        )
-        if not shelf:
-            shelf = StorageRack(name=shelf_name, compartment_id=container.id)
-            self.session.add(shelf)
-            self.session.flush()
-            
-            # Auto-create 6 Racks under shelf when shelf doesn't exist
+            # Auto-create 6 racks (A-F) under new shelf
             for rack_val in VALID_RACKS:
-                rack = StorageDrawer(name=rack_val, rack_id=shelf.id)
-                self.session.add(rack)
+                self.session.add(StorageRack(name=rack_val, compartment_id=compartment.id))
             self.session.flush()
 
-        # Get or create Rack (StorageDrawer with rack_letter)
-        rack = next(
-            (r for r in shelf.drawers if r.name == rack_letter),
-            None
-        )
+        # StorageRack = Rack letter (A / B / C / D / E / F)
+        rack = next((r for r in compartment.racks if r.name == rack_letter), None)
         if not rack:
-            rack = StorageDrawer(name=rack_letter, rack_id=shelf.id)
+            rack = StorageRack(name=rack_letter, compartment_id=compartment.id)
             self.session.add(rack)
             self.session.flush()
-            
-            # Auto-create 5 Drawers under rack when rack doesn't exist
+            # Auto-create 5 drawers (01-05) under new rack
             for drawer_val in VALID_DRAWERS:
-                drawer = StorageBox(name=drawer_val, drawer_id=rack.id, rows=10, cols=10)
-                self.session.add(drawer)
-            self.session.flush()
-            
-            # Pre-populate grid positions for new drawers
-            for drawer in rack.boxes:
-                for row in range(10):
-                    for col in range(10):
-                        self.session.add(BoxPosition(box_id=drawer.id, row=row, col=col))
+                self.session.add(StorageDrawer(name=drawer_val, rack_id=rack.id))
             self.session.flush()
 
-        # Get or create Drawer (StorageBox with drawer_number)
-        drawer = next(
-            (d for d in rack.boxes if d.name == drawer_number),
-            None
-        )
+        # StorageDrawer = Drawer number (01 / 02 / 03 / 04 / 05)
+        drawer = next((d for d in rack.drawers if d.name == drawer_number), None)
         if not drawer:
-            drawer = StorageBox(name=drawer_number, drawer_id=rack.id, rows=10, cols=10)
+            drawer = StorageDrawer(name=drawer_number, rack_id=rack.id)
             self.session.add(drawer)
             self.session.flush()
-            
-            #Auto-create 5 Boxes under drawer when drawer doesn't exist
-            for box_val in VALID_BOXES:
-                box = StorageBox(name=box_val, parent_box_id=drawer.id, rows=10, cols=10)
-                self.session.add(box)
-                self.session.flush()  # Flush to get the box.id
-    
-                # Pre-populate grid positions for this newly created box
-                for row in range(10):
-                    for col in range(10):
-                        self.session.add(BoxPosition(box_id=box.id, row=row, col=col))
-            self.session.flush()
 
-        # Get Box-1 (default box in the drawer)
-        box = next(
-            (b for b in drawer.child_boxes if b.name == "Box-1"),
-            None
-        )
+        # StorageBox = container_name (actual box label from Excel col O)
+        # Use direct query to avoid stale ORM collection cache on repeated calls
+        box = self.session.query(StorageBox).filter(
+            StorageBox.name == container_name,
+            StorageBox.drawer_id == drawer.id,
+        ).first()
         if not box:
-            box = StorageBox(name="Box-1", parent_box_id=drawer.id, rows=10, cols=10)
+            box = StorageBox(name=container_name, drawer_id=drawer.id, rows=10, cols=10)
             self.session.add(box)
             self.session.flush()
-            
-            # Pre-populate grid positions for new box
-            for row in range(10):
-                for col in range(10):
-                    self.session.add(BoxPosition(box_id=box.id, row=row, col=col))
+            for r in range(10):
+                for c in range(10):
+                    self.session.add(BoxPosition(box_id=box.id, row=r, col=c))
             self.session.flush()
 
-        return freezer, container, shelf, rack, box
+        return freezer, compartment, rack, drawer, box
+
+    def _get_or_create_storage_hierarchy_cylindrical(
+        self, freezer_name: str, container_name: str, rack_number: str
+    ) -> tuple[Freezer, Compartment, StorageRack, StorageDrawer, StorageBox]:
+        """
+        Cylindrical freezer hierarchy (Freezer 3 & 4).
+
+        No shelf or drawer in the physical structure.
+        Uses sentinel Compartment("CYLINDRICAL") and Drawer("01") to satisfy
+        the fixed-depth DB model.
+
+          CYLINDRICAL_SENTINEL_COMPARTMENT → Compartment
+          rack_number (01-13)              → StorageRack
+          CYLINDRICAL_SENTINEL_DRAWER      → StorageDrawer
+          container_name (col O)           → StorageBox
+        """
+        freezer_repo = FreezerRepository(self.session)
+
+        freezer = freezer_repo.get_by_name(freezer_name)
+        if not freezer:
+            freezer = Freezer(name=freezer_name)
+            self.session.add(freezer)
+            self.session.flush()
+
+        compartment = next(
+            (c for c in freezer.compartments
+             if c.name == CYLINDRICAL_SENTINEL_COMPARTMENT), None
+        )
+        if not compartment:
+            compartment = Compartment(
+                name=CYLINDRICAL_SENTINEL_COMPARTMENT, freezer_id=freezer.id
+            )
+            self.session.add(compartment)
+            self.session.flush()
+
+        rack = next((r for r in compartment.racks if r.name == rack_number), None)
+        if not rack:
+            rack = StorageRack(name=rack_number, compartment_id=compartment.id)
+            self.session.add(rack)
+            self.session.flush()
+
+        drawer = next(
+            (d for d in rack.drawers if d.name == CYLINDRICAL_SENTINEL_DRAWER), None
+        )
+        if not drawer:
+            drawer = StorageDrawer(
+                name=CYLINDRICAL_SENTINEL_DRAWER, rack_id=rack.id
+            )
+            self.session.add(drawer)
+            self.session.flush()
+
+        box = self.session.query(StorageBox).filter(
+            StorageBox.name == container_name,
+            StorageBox.drawer_id == drawer.id,
+        ).first()
+        if not box:
+            box = StorageBox(name=container_name, drawer_id=drawer.id, rows=10, cols=10)
+            self.session.add(box)
+            self.session.flush()
+            for r in range(10):
+                for c in range(10):
+                    self.session.add(BoxPosition(box_id=box.id, row=r, col=c))
+            self.session.flush()
+
+        return freezer, compartment, rack, drawer, box
 
     def import_rows(self, rows: list[ImportRow], study_id: int) -> tuple[int, Optional[str]]:
         """
@@ -509,7 +556,6 @@ class ExcelImportService:
                 ).first()
                 
                 if not participant:
-                    # Create new participant only if it doesn't exist
                     participant = Participant(
                         pid=row.pid,
                         study_id=study_id,
@@ -523,9 +569,6 @@ class ExcelImportService:
                     )
                     self.session.add(participant)
                     self.session.flush()
-                    print(f"[DEBUG] Created new participant: ID={participant.id}, PID={participant.pid}")
-                else:
-                    print(f"[DEBUG] Using existing participant: ID={participant.id}, PID={participant.pid}")
 
                 # 2. Create Sample
                 if row.date_collected:
@@ -570,11 +613,19 @@ class ExcelImportService:
 
                 # 4. Set storage location if provided
                 if row.freezer_name:
-                    # Get or create storage hierarchy and set aliquot location
-                    freezer, container, shelf, rack, box = self._get_or_create_storage_hierarchy(
-                        row.freezer_name, row.container_name, row.shelf_name,
-                        row.rack_drawer_combined
-                    )
+                    is_cylindrical = not row.shelf_name
+                    if is_cylindrical:
+                        freezer, container, shelf, rack, box = \
+                            self._get_or_create_storage_hierarchy_cylindrical(
+                                row.freezer_name, row.container_name,
+                                row.rack_drawer_combined
+                            )
+                    else:
+                        freezer, container, shelf, rack, box = \
+                            self._get_or_create_storage_hierarchy(
+                                row.freezer_name, row.container_name,
+                                row.shelf_name, row.rack_drawer_combined
+                            )
 
                     # Place the aliquot in the box grid
                     if row.position:
