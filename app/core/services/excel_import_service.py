@@ -412,31 +412,37 @@ class ExcelImportService:
             self.session.flush()
 
         # Compartment = Shelf (I / II / III / IV)
-        compartment = next(
-            (c for c in freezer.compartments if c.name == shelf_name), None
-        )
+        # Direct query avoids stale ORM collection cache when same shelf appears in multiple rows
+        compartment = self.session.query(Compartment).filter(
+            Compartment.name == shelf_name,
+            Compartment.freezer_id == freezer.id,
+        ).first()
         if not compartment:
             compartment = Compartment(name=shelf_name, freezer_id=freezer.id)
             self.session.add(compartment)
             self.session.flush()
-            # Auto-create 6 racks (A-F) under new shelf
             for rack_val in VALID_RACKS:
                 self.session.add(StorageRack(name=rack_val, compartment_id=compartment.id))
             self.session.flush()
 
         # StorageRack = Rack letter (A / B / C / D / E / F)
-        rack = next((r for r in compartment.racks if r.name == rack_letter), None)
+        rack = self.session.query(StorageRack).filter(
+            StorageRack.name == rack_letter,
+            StorageRack.compartment_id == compartment.id,
+        ).first()
         if not rack:
             rack = StorageRack(name=rack_letter, compartment_id=compartment.id)
             self.session.add(rack)
             self.session.flush()
-            # Auto-create 5 drawers (01-05) under new rack
             for drawer_val in VALID_DRAWERS:
                 self.session.add(StorageDrawer(name=drawer_val, rack_id=rack.id))
             self.session.flush()
 
         # StorageDrawer = Drawer number (01 / 02 / 03 / 04 / 05)
-        drawer = next((d for d in rack.drawers if d.name == drawer_number), None)
+        drawer = self.session.query(StorageDrawer).filter(
+            StorageDrawer.name == drawer_number,
+            StorageDrawer.rack_id == rack.id,
+        ).first()
         if not drawer:
             drawer = StorageDrawer(name=drawer_number, rack_id=rack.id)
             self.session.add(drawer)
@@ -482,10 +488,10 @@ class ExcelImportService:
             self.session.add(freezer)
             self.session.flush()
 
-        compartment = next(
-            (c for c in freezer.compartments
-             if c.name == CYLINDRICAL_SENTINEL_COMPARTMENT), None
-        )
+        compartment = self.session.query(Compartment).filter(
+            Compartment.name == CYLINDRICAL_SENTINEL_COMPARTMENT,
+            Compartment.freezer_id == freezer.id,
+        ).first()
         if not compartment:
             compartment = Compartment(
                 name=CYLINDRICAL_SENTINEL_COMPARTMENT, freezer_id=freezer.id
@@ -493,15 +499,19 @@ class ExcelImportService:
             self.session.add(compartment)
             self.session.flush()
 
-        rack = next((r for r in compartment.racks if r.name == rack_number), None)
+        rack = self.session.query(StorageRack).filter(
+            StorageRack.name == rack_number,
+            StorageRack.compartment_id == compartment.id,
+        ).first()
         if not rack:
             rack = StorageRack(name=rack_number, compartment_id=compartment.id)
             self.session.add(rack)
             self.session.flush()
 
-        drawer = next(
-            (d for d in rack.drawers if d.name == CYLINDRICAL_SENTINEL_DRAWER), None
-        )
+        drawer = self.session.query(StorageDrawer).filter(
+            StorageDrawer.name == CYLINDRICAL_SENTINEL_DRAWER,
+            StorageDrawer.rack_id == rack.id,
+        ).first()
         if not drawer:
             drawer = StorageDrawer(
                 name=CYLINDRICAL_SENTINEL_DRAWER, rack_id=rack.id
