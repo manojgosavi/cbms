@@ -200,6 +200,55 @@ class DashboardService:
             for r in q.all()
         ]
 
+    # ── Cohort flowchart data ──────────────────────────────────────────────
+
+    def get_flowchart_data(self, study_id: Optional[int] = None) -> dict:
+        """
+        Returns nested dict for the dashboard flowchart:
+          data[cohort_name][pop_key][visit_name][sample_type] = (n_participants, n_vials)
+
+        For non-UNINFECTED cohorts pop_key is always "_all".
+        For HIV UNINFECTED, pop_key is the population sub-group (FSW/PWID/MSM).
+        """
+        from collections import defaultdict
+
+        UNINFECTED = "HIV UNINFECTED"
+        POP_GROUPS = {"FSW", "PWID", "MSM"}
+
+        q = (
+            self.session.query(
+                Participant.cohort_name,
+                Participant.population,
+                Sample.visit_name,
+                Sample.sample_type,
+                func.count(func.distinct(Participant.id)).label("n_part"),
+                func.count(SampleAliquot.id).label("n_vials"),
+            )
+            .join(Sample,        Sample.participant_id == Participant.id)
+            .join(SampleAliquot, SampleAliquot.sample_id == Sample.id)
+            .group_by(
+                Participant.cohort_name,
+                Participant.population,
+                Sample.visit_name,
+                Sample.sample_type,
+            )
+        )
+        if study_id:
+            q = q.filter(Participant.study_id == study_id)
+
+        data: dict = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
+
+        for cohort, population, visit_name, sample_type, n_part, n_vials in q.all():
+            if not cohort or not visit_name or not sample_type:
+                continue
+            if cohort == UNINFECTED:
+                pop_key = population if population in POP_GROUPS else "Other"
+            else:
+                pop_key = "_all"
+            data[cohort][pop_key][visit_name][sample_type] = (n_part, n_vials)
+
+        return data
+
     # ── Quick totals (for summary cards) ──────────────────────────────────
 
     def summary_totals(self) -> Dict:
