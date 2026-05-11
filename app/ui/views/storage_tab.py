@@ -177,17 +177,13 @@ class StorageTab(QWidget):
                     for rack in comp.racks:
                         drawers = []
                         for drawer_box in rack.drawers:  # drawer_box is StorageDrawer
-                            # Get all drawer-level StorageBox objects under this StorageDrawer
-                            drawer_boxes = [
-                                (db.id, db.name, 
-                                 [(b.id, b.name, b.rows, b.cols,
-                                   b.occupied_positions, b.total_positions)
-                                  for b in db.child_boxes],  # Get nested boxes (Box-1, Box-2, etc.)
-                                 )
-                                for db in drawer_box.boxes  # db = drawer-level StorageBox (01, 02, etc.)
+                            # Each StorageDrawer holds StorageBox objects named from container_name
+                            boxes = [
+                                (b.id, b.name, b.rows, b.cols,
+                                 b.occupied_positions, b.total_positions)
+                                for b in drawer_box.boxes
                             ]
-                            for drawer_id, drawer_name, boxes in drawer_boxes:
-                                drawers.append((drawer_id, drawer_name, boxes))
+                            drawers.append((drawer_box.id, drawer_box.name, boxes))
                         racks.append((rack.id, rack.name, drawers))
                     comps.append((comp.id, comp.name, racks))
                 tree_data.append((f.id, f.name, f.temperature or "", comps))
