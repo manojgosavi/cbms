@@ -20,7 +20,7 @@ from app.utils.exception_handler import slot_safe
 class ParticipantTab(QWidget):
 
     COLUMNS = ["PID", "Study", "Age", "Gender", "Population", "Disease",
-               "Site", "Cohort Name", "Notes", "Registered"]
+               "Site", "Cohort Name", "Visit Code", "Notes", "Registered"]
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -136,6 +136,9 @@ class ParticipantTab(QWidget):
                     p.disease or "",
                     p.site_name or "",
                     p.cohort_name or "",
+                    ", ".join(sorted(set(
+                        s.visit_code for s in p.samples if s.visit_code
+                    ))),
                     p.notes or "",
                     str(p.created_at.date()) if p.created_at else "",
                     p.id,  # hidden

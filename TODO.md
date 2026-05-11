@@ -2,7 +2,7 @@
 
 ## Now
 
-- In Participant tab, add the visit code in the display from import from excel
+- ~~In Participant tab, add the visit code in the display from import from excel~~ ✓ done
 
 ## Next
 

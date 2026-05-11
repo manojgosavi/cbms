@@ -317,7 +317,7 @@ These are acknowledged deficiencies, not bugs to hotfix:
 
 | ID  | Area            | Description                                                    | Priority |
 |-----|-----------------|----------------------------------------------------------------|----------|
-| G1  | Participant tab  | Visit code not shown in participant list after Excel import    | High     |
+| G1  | Participant tab  | ~~Visit code not shown in participant list after Excel import~~ | Resolved 2026-05-11 |
 | G2  | Sample tab       | Left hierarchy groups by visit name; should use visit code     | Medium   |
 | G3  | Storage tab      | Shipped boxes do not turn grey in the box grid                 | Medium   |
 | G4  | Catalogue tab    | Advanced search filters missing (parity with Search tab)       | Low      |
@@ -332,3 +332,4 @@ These are acknowledged deficiencies, not bugs to hotfix:
 | Date       | Change                              | Author        |
 |------------|-------------------------------------|---------------|
 | 2026-05-11 | Initial constitution written        | Claude Code   |
+| 2026-05-11 | G1 resolved: Visit Code column added to Participant tab | Claude Code |
