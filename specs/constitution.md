@@ -260,7 +260,7 @@ Every button or menu action that requires a permission must call `Role.can(app_s
 | Empty         | White      |
 | Occupied      | Blue       |
 | Blocked       | Orange     |
-| Shipped       | Grey (TODO — not yet implemented) |
+| Shipped       | Grey (`#A0A0A0`) — Move/Remove disabled |
 
 ---
 
@@ -319,7 +319,7 @@ These are acknowledged deficiencies, not bugs to hotfix:
 |-----|-----------------|----------------------------------------------------------------|----------|
 | G1  | Participant tab  | ~~Visit code not shown in participant list after Excel import~~ | Resolved 2026-05-11 |
 | G2  | Sample tab       | ~~Left hierarchy groups by visit name; should use visit code~~ | Resolved 2026-05-11 |
-| G3  | Storage tab      | Shipped boxes do not turn grey in the box grid                 | Medium   |
+| G3  | Storage tab      | ~~Shipped boxes do not turn grey in the box grid~~             | Resolved 2026-05-11 |
 | G4  | Catalogue tab    | Advanced search filters missing (parity with Search tab)       | Low      |
 | G5  | Auth             | No login rate-limiting (acceptable for local-only deployment)  | Low      |
 | G6  | Backup           | No scheduled/automatic backup                                  | Low      |
@@ -334,3 +334,4 @@ These are acknowledged deficiencies, not bugs to hotfix:
 | 2026-05-11 | Initial constitution written        | Claude Code   |
 | 2026-05-11 | G1 resolved: Visit Code column added to Participant tab | Claude Code |
 | 2026-05-11 | G2 resolved: Sample tab visit hierarchy now groups by visit_code | Claude Code |
+| 2026-05-11 | G3 resolved: Shipped cells render grey; Move/Remove locked on shipped cells | Claude Code |
