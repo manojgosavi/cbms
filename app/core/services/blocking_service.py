@@ -100,7 +100,6 @@ class BlockingService:
         aliquot_id: int,
         reason: str = "Released by user",
     ) -> Tuple[bool, str]:
-        app_session.require("sample.edit")
 
         aliquot = self.session.get(SampleAliquot, aliquot_id)
         if not aliquot:

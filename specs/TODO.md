@@ -33,4 +33,5 @@
 - ~~In Storage tab, in the box grid, can you adjust font so that it doesn't go outside the cell.~~ ✓ done
 - ~~In Participant tab, & in general all tabs, sometime columns width are too large, can you adjust it.~~ ✓ done
 - ~~In Sample tab, search by typing PID, checkboxes for multiple selection, sorted option. The filter should be similar to what we have in excel worksheet column.~~ ✓ done
+- ~~In Search tab, there are 3 changes, firstly can you add unblock selected button at top right and unblock functionality with reason.This should be enabled for all users type.Secondly add visit code filter in left pane.Lastly, add population filter in left pane & change the age filter heading to age, currently is population. Also check search by cohort , it is not returning results.~~ ✓ done
 - ~~Fix: double-clicking a record in Search tab should navigate to the Storage tab and highlight the aliquot's box position in the box grid.~~ ✓ done
