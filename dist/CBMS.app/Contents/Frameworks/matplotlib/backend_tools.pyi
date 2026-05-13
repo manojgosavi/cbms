@@ -1,1 +1,0 @@
-../../Resources/matplotlib/backend_tools.pyi

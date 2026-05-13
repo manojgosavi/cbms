@@ -1,1 +1,0 @@
-../../Resources/matplotlib/_c_internal_utils.pyi

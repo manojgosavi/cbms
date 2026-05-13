@@ -1,1 +1,0 @@
-../../Resources/matplotlib/font_manager.pyi

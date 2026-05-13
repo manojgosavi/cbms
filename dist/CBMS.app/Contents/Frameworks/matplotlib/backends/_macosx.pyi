@@ -1,1 +1,0 @@
-../../../Resources/matplotlib/backends/_macosx.pyi

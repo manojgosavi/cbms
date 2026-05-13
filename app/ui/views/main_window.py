@@ -213,3 +213,4 @@ class MainWindow(QMainWindow):
 
     def show_aliquot_location(self, aliquot_db_id: int):
         self.tabs.setCurrentWidget(self.storage_tab)
+        self.storage_tab.navigate_to_aliquot(aliquot_db_id)

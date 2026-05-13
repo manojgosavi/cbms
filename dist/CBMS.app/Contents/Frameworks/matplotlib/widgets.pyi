@@ -1,1 +1,0 @@
-../../Resources/matplotlib/widgets.pyi

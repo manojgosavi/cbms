@@ -1,1 +1,0 @@
-../../../Resources/numpy/core/arrayprint.py
