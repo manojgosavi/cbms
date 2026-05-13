@@ -45,7 +45,7 @@ class SearchFilters:
     age:      Optional[int]  = None
     gender:       Optional[str]  = None
     disease:      Optional[str]  = None
-    cohort_name:       Optional[str]  = None
+    cohort:            Optional[str]  = None
     population:   Optional[str]  = None
     site_name:    Optional[str]  = None
     visit_time:   Optional[str] = None
@@ -161,7 +161,7 @@ class SearchService:
         if filters.disease:
             conditions.append(Participant.disease.ilike(f"%{filters.disease}%"))
         if filters.cohort:
-            conditions.append(Participant.cohort_name.ilike(f"%{filters.cohort_name}%"))
+            conditions.append(Participant.cohort_name.ilike(f"%{filters.cohort}%"))
         if filters.population:
             conditions.append(Participant.population.ilike(f"%{filters.population}%"))
         if filters.site_name:
@@ -170,6 +170,8 @@ class SearchService:
         # Sample filters
         if filters.sample_type:
             conditions.append(Sample.sample_type.ilike(f"%{filters.sample_type}%"))
+        if filters.visit_code:
+            conditions.append(Sample.visit_code.ilike(f"%{filters.visit_code}%"))
         if filters.collection_date_from:
             conditions.append(Sample.collection_date >= filters.collection_date_from)
         if filters.collection_date_to:
@@ -202,7 +204,7 @@ class SearchService:
             "age":             Participant.age,
             "gender":          Participant.gender,
             "disease":         Participant.disease,
-            "cohort":          Participant.cohort_name,
+            "cohort":          Participant.cohort_name,  # DB column is cohort_name
             "collection_date": Sample.collection_date,
             "location":        AliquotLocation.id,
         }

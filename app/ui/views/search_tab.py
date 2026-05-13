@@ -66,30 +66,35 @@ class SearchTab(QWidget):
         form.setSpacing(6)
         form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
 
-        # Participant group - ONLY PID
         form.addRow(self._section_label("Participant"))
-        self._f_pid  = QLineEdit(); self._f_pid.setPlaceholderText("partial match")
-        form.addRow("PID:",        self._f_pid)
+        self._f_pid = QLineEdit(); self._f_pid.setPlaceholderText("partial match")
+        form.addRow("PID:", self._f_pid)
 
-        form.addRow(self._section_label("Population"))
+        self._f_population = QLineEdit(); self._f_population.setPlaceholderText("partial match")
+        form.addRow("Population:", self._f_population)
+
+        form.addRow(self._section_label("Age"))
         self._f_age = QSpinBox(); self._f_age.setRange(0, 150)
-        form.addRow("Age:",        self._f_age)
+        form.addRow("Age:", self._f_age)
 
         form.addRow(self._section_label("Site Name"))
         self._f_site = QLineEdit(); self._f_site.setPlaceholderText("partial match")
-        form.addRow("Site:",       self._f_site)
+        form.addRow("Site:", self._f_site)
 
-        form.addRow(self._section_label("Visit Time"))
-        self._f_visit_time = QLineEdit(); self._f_visit_time.setPlaceholderText("partial match (e.g. M0, M3, etc.)")
+        form.addRow(self._section_label("Visit"))
+        self._f_visit_time = QLineEdit(); self._f_visit_time.setPlaceholderText("partial match (e.g. M0, M3)")
         form.addRow("Visit Time:", self._f_visit_time)
+
+        self._f_visit_code = QLineEdit(); self._f_visit_code.setPlaceholderText("partial match (e.g. 1.0)")
+        form.addRow("Visit Code:", self._f_visit_code)
 
         form.addRow(self._section_label("Cohort"))
         self._f_cohort = QLineEdit(); self._f_cohort.setPlaceholderText("partial match")
-        form.addRow("Cohort:",       self._f_cohort)
+        form.addRow("Cohort:", self._f_cohort)
 
         form.addRow(self._section_label("Disease"))
         self._f_disease = QLineEdit(); self._f_disease.setPlaceholderText("partial match")
-        form.addRow("Disease:",    self._f_disease)
+        form.addRow("Disease:", self._f_disease)
 
         form.addRow(self._section_label("Sample Type"))
         self._f_sample_type = QLineEdit(); self._f_sample_type.setPlaceholderText("partial match")
@@ -128,16 +133,19 @@ class SearchTab(QWidget):
         self._lbl_count = QLabel("Run a search to see results.")
         self._lbl_count.setStyleSheet("color: grey;")
 
-        self._btn_block  = QPushButton("Block selected…")
-        self._btn_ship   = QPushButton("Ship selected…")
-        self._btn_export = QPushButton("Export to Excel")
-        self._btn_locate = QPushButton("Show in box")
+        self._btn_block   = QPushButton("Block selected…")
+        self._btn_unblock = QPushButton("Unblock selected…")
+        self._btn_ship    = QPushButton("Ship selected…")
+        self._btn_export  = QPushButton("Export to Excel")
+        self._btn_locate  = QPushButton("Show in box")
 
         self._btn_block.setEnabled(False)
+        self._btn_unblock.setEnabled(False)
         self._btn_ship.setEnabled(False)
         self._btn_locate.setEnabled(False)
 
         self._btn_block.clicked.connect(self._on_block)
+        self._btn_unblock.clicked.connect(self._on_unblock)
         self._btn_ship.clicked.connect(self._on_ship)
         self._btn_export.clicked.connect(self._on_export)
         self._btn_locate.clicked.connect(self._on_locate)
@@ -146,6 +154,7 @@ class SearchTab(QWidget):
         results_toolbar.addStretch()
         results_toolbar.addWidget(self._btn_locate)
         results_toolbar.addWidget(self._btn_block)
+        results_toolbar.addWidget(self._btn_unblock)
         results_toolbar.addWidget(self._btn_ship)
         results_toolbar.addWidget(self._btn_export)
         right_layout.addLayout(results_toolbar)
@@ -187,13 +196,16 @@ class SearchTab(QWidget):
     def _build_filters(self) -> SearchFilters:
         f = SearchFilters()
 
-        f.pid        = self._f_pid.text().strip() or None
-        f.age        = self._f_age.value() or None
-        f.site_name  = self._f_site.text().strip() or None
-        f.visit_time = self._f_visit_time.text().strip() if self._f_visit_time.text().strip() else None
-        f.cohort     = self._f_cohort.text().strip() or None
-        f.disease    = self._f_disease.text().strip() or None
+        f.pid         = self._f_pid.text().strip() or None
+        f.population  = self._f_population.text().strip() or None
+        f.age         = self._f_age.value() or None
+        f.site_name   = self._f_site.text().strip() or None
+        f.visit_time  = self._f_visit_time.text().strip() or None
+        f.visit_code  = self._f_visit_code.text().strip() or None
+        f.cohort      = self._f_cohort.text().strip() or None
+        f.disease     = self._f_disease.text().strip() or None
         f.sample_type = self._f_sample_type.text().strip() or None
+        f.use_or      = self._or_radio.isChecked()
         return f
 
     def _col(self, row: int, col: int, value) -> None:
@@ -254,9 +266,11 @@ class SearchTab(QWidget):
     @slot_safe
     def _on_clear(self):
         self._f_pid.clear()
+        self._f_population.clear()
         self._f_age.setValue(0)
         self._f_site.clear()
         self._f_visit_time.clear()
+        self._f_visit_code.clear()
         self._f_cohort.clear()
         self._f_disease.clear()
         self._f_sample_type.clear()
@@ -267,10 +281,17 @@ class SearchTab(QWidget):
 
     @slot_safe
     def _on_selection_changed(self):
-        has = bool(self._table.selectedItems())
+        selected_rows = set(idx.row() for idx in self._table.selectionModel().selectedRows())
+        has = bool(selected_rows)
+        has_blocked = any(
+            self._results[r].is_blocked
+            for r in selected_rows
+            if r < len(self._results)
+        )
         self._btn_block.setEnabled(has)
+        self._btn_unblock.setEnabled(has_blocked)
         self._btn_ship.setEnabled(has)
-        self._btn_locate.setEnabled(len(self._table.selectionModel().selectedRows()) == 1)
+        self._btn_locate.setEnabled(len(selected_rows) == 1)
 
     def _selected_aliquot_ids(self) -> list[int]:
         rows = set(idx.row() for idx in self._table.selectionModel().selectedRows())
@@ -290,6 +311,21 @@ class SearchTab(QWidget):
             return
         from app.ui.dialogs.block_dialog import BlockDialog
         dlg = BlockDialog(self, aliquot_ids=aliquot_ids)
+        if dlg.exec():
+            self._on_search()
+
+    @slot_safe
+    def _on_unblock(self):
+        selected_rows = set(idx.row() for idx in self._table.selectionModel().selectedRows())
+        aliquot_ids = [
+            self._results[r].aliquot_db_id
+            for r in selected_rows
+            if r < len(self._results) and self._results[r].is_blocked
+        ]
+        if not aliquot_ids:
+            return
+        from app.ui.dialogs.unblock_dialog import UnblockDialog
+        dlg = UnblockDialog(self, aliquot_ids=aliquot_ids)
         if dlg.exec():
             self._on_search()
 
