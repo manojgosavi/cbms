@@ -21,7 +21,7 @@ from typing import Optional
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QComboBox, QGroupBox, QHBoxLayout,
+    QAbstractItemView, QComboBox, QHBoxLayout,
     QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem,
     QPushButton, QSplitter, QTreeWidget, QTreeWidgetItem,
     QVBoxLayout, QWidget,
@@ -51,16 +51,16 @@ class SampleTab(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
 
-        # ── Study selector ─────────────────────────────────────────────────
-        sel_box = QGroupBox("Select study")
-        sel_layout = QHBoxLayout(sel_box)
+        # ── Study selector (compact single row) ───────────────────────────
+        study_row = QHBoxLayout()
+        study_row.setContentsMargins(0, 0, 0, 4)
         self._study_combo = QComboBox()
-        self._study_combo.setMinimumWidth(120)
+        self._study_combo.setMinimumWidth(160)
         self._study_combo.currentIndexChanged.connect(self._on_study_changed)
-        sel_layout.addWidget(QLabel("Study:"))
-        sel_layout.addWidget(self._study_combo)
-        sel_layout.addStretch()
-        layout.addWidget(sel_box)
+        study_row.addWidget(QLabel("Study:"))
+        study_row.addWidget(self._study_combo)
+        study_row.addStretch()
+        layout.addLayout(study_row)
 
         # ── Main splitter: participant+visit left, sample tree right ───────
         splitter = QSplitter(Qt.Orientation.Horizontal)
