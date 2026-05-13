@@ -32,3 +32,4 @@
 - ~~Implement previous change to existing data imported from excel~~ ✓ done (run: python migrate_storage.py)
 - ~~In Storage tab, in the box grid, can you adjust font so that it doesn't go outside the cell.~~ ✓ done
 - ~~In Participant tab, & in general all tabs, sometime columns width are too large, can you adjust it.~~ ✓ done
+- ~~In Sample tab, search by typing PID, checkboxes for multiple selection, sorted option. The filter should be similar to what we have in excel worksheet column.~~ ✓ done
