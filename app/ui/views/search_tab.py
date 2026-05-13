@@ -70,6 +70,7 @@ class SearchTab(QWidget):
         self._f_pid = QLineEdit(); self._f_pid.setPlaceholderText("partial match")
         form.addRow("PID:", self._f_pid)
 
+        form.addRow(self._section_label("Population"))
         self._f_population = QLineEdit(); self._f_population.setPlaceholderText("partial match")
         form.addRow("Population:", self._f_population)
 
@@ -81,10 +82,11 @@ class SearchTab(QWidget):
         self._f_site = QLineEdit(); self._f_site.setPlaceholderText("partial match")
         form.addRow("Site:", self._f_site)
 
-        form.addRow(self._section_label("Visit"))
+        form.addRow(self._section_label("Visit Time"))
         self._f_visit_time = QLineEdit(); self._f_visit_time.setPlaceholderText("partial match (e.g. M0, M3)")
         form.addRow("Visit Time:", self._f_visit_time)
 
+        form.addRow(self._section_label("Visit Code"))
         self._f_visit_code = QLineEdit(); self._f_visit_code.setPlaceholderText("partial match (e.g. 1.0)")
         form.addRow("Visit Code:", self._f_visit_code)
 
