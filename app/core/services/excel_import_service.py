@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 from pathlib import Path
 import re
 from typing import Optional
@@ -38,6 +39,38 @@ VALID_DRAWERS  = ["01", "02", "03", "04", "05"]
 VALID_CYLINDRICAL_RACKS           = [f"{i:02d}" for i in range(1, 14)]
 CYLINDRICAL_SENTINEL_COMPARTMENT  = "CYLINDRICAL"
 CYLINDRICAL_SENTINEL_DRAWER       = "01"
+
+# Import-time aliases: maps lowercase raw value → canonical enum value.
+# Used when the source data uses abbreviations or alternate spellings.
+_SITE_ALIASES: dict[str, str] = {
+    "nari":      "ICMR-NARI",
+    "icmr-nari": "ICMR-NARI",
+    "nirt":      "NIRT",
+    "icmr-nirt": "ICMR-NIRT",
+}
+_COHORT_ALIASES: dict[str, str] = {
+    "hiv infected-adults": "HIV INFECTED-ADULT",
+}
+_DISEASE_ALIASES: dict[str, str] = {
+    "infected w/o co-morbidity":      "Infected without co-morbidity",
+    "infected without co-morbidity":  "Infected without co-morbidity",
+    "unknown-screen failure":         "Unknown-Screen failure",
+}
+_SAMPLE_TYPE_ALIASES: dict[str, str] = {
+    "hep plasma": "HEP Plasma",
+}
+
+
+def _apply_alias(raw: str, alias_map: dict[str, str]) -> str:
+    return alias_map.get(raw.lower().strip(), raw)
+
+
+def _clean_dot(val) -> Optional[str]:
+    """Treat '.' placeholder cells as empty."""
+    if val is None:
+        return None
+    s = str(val).strip()
+    return None if s in ('', '.') else s
 
 
 @dataclass
@@ -109,11 +142,17 @@ class ExcelImportService:
         actual_headers = [cell for cell in ws[1]]
         actual_headers = [h.value if h else None for h in actual_headers[:21]]
 
-        if actual_headers != self.EXPECTED_HEADERS:
+        mismatches = []
+        for i, (exp, got) in enumerate(zip(self.EXPECTED_HEADERS, actual_headers)):
+            e_norm = str(exp or '').lower().strip()
+            g_norm = str(got or '').lower().strip()
+            if e_norm != g_norm:
+                ratio = SequenceMatcher(None, e_norm, g_norm).ratio()
+                if ratio < 0.80:
+                    mismatches.append(f"Column {i+1}: expected '{exp}', got '{got}'")
+        if mismatches:
             return [], [
-                f"Excel header mismatch.\n"
-                f"Expected: {self.EXPECTED_HEADERS}\n"
-                f"Got: {actual_headers}"
+                "Excel header mismatch:\n" + "\n".join(mismatches)
             ]
 
         # Parse rows
@@ -137,14 +176,14 @@ class ExcelImportService:
                 sample_type=row_data[10],
                 cohort_name=row_data[11],
                 aliquot_id=row_data[12],
-                freezer_name=row_data[13],
-                container_name=row_data[14],
+                freezer_name=_clean_dot(row_data[13]),
+                container_name=_clean_dot(row_data[14]),
                 slot_position=row_data[15],
-                shelf_name=row_data[16],
-                rack_drawer_combined=row_data[17],
-                position=row_data[18],  # Will be populated during validation
-                discrepancy_remark=row_data[19],
-                discrepancy_for=row_data[20],
+                shelf_name=_clean_dot(row_data[16]),
+                rack_drawer_combined=_clean_dot(row_data[17]),
+                position=_clean_dot(row_data[18]),  # Will be populated during validation
+                discrepancy_remark=_clean_dot(row_data[19]),
+                discrepancy_for=_clean_dot(row_data[20]),
             )
             rows.append(import_row)
 
@@ -174,54 +213,68 @@ class ExcelImportService:
             except (ValueError, TypeError):
                 errors.append(f"Age must be an integer, got '{row.age}'")
 
-        # Gender (enum validation)
+        # Gender
         if row.gender:
-            row.gender = str(row.gender).strip()
-            valid_genders = [e.value for e in Gender]
-            if row.gender not in valid_genders:
-                errors.append(f"Invalid Gender '{row.gender}'. Allowed: {valid_genders}")
+            raw = str(row.gender).strip()
+            m = Gender(raw)
+            if m is None:
+                errors.append(f"Invalid Gender '{raw}'. Allowed: {[e.value for e in Gender]}")
+            else:
+                row.gender = m.value
 
-        # Population (enum validation)
+        # Population
         if row.population:
-            row.population = str(row.population).strip()
-            valid_pops = [e.value for e in Population]
-            if row.population not in valid_pops:
-                errors.append(f"Invalid Population '{row.population}'. Allowed: {valid_pops}")
+            raw = str(row.population).strip()
+            m = Population(raw)
+            if m is None:
+                errors.append(f"Invalid Population '{raw}'. Allowed: {[e.value for e in Population]}")
+            else:
+                row.population = m.value
 
-        # Disease (enum validation)
+        # Disease (alias first, then enum)
         if row.disease:
-            row.disease = str(row.disease).strip()
-            valid_diseases = [e.value for e in Disease]
-            if row.disease not in valid_diseases:
-                errors.append(f"Invalid Disease '{row.disease}'. Allowed: {valid_diseases}")
+            raw = _apply_alias(str(row.disease).strip(), _DISEASE_ALIASES)
+            m = Disease(raw)
+            if m is None:
+                errors.append(f"Invalid Disease '{row.disease}'. Allowed: {[e.value for e in Disease]}")
+            else:
+                row.disease = m.value
 
-        # Site Name (enum validation)
+        # Site Name (alias first, then enum)
         if row.site_name:
-            row.site_name = str(row.site_name).strip()
-            valid_sites = [e.value for e in Site]
-            if row.site_name not in valid_sites:
-                errors.append(f"Invalid Site '{row.site_name}'. Allowed: {valid_sites}")
+            raw = _apply_alias(str(row.site_name).strip(), _SITE_ALIASES)
+            m = Site(raw)
+            if m is None:
+                errors.append(f"Invalid Site '{row.site_name}'. Allowed: {[e.value for e in Site]}")
+            else:
+                row.site_name = m.value
 
-        # Visit Name (enum validation)
+        # Visit Name
         if row.visit_name:
-            row.visit_name = str(row.visit_name).strip()
-            valid_visits = [e.value for e in VisitName]
-            if row.visit_name not in valid_visits:
-                errors.append(f"Invalid Visit Name '{row.visit_name}'. Allowed: {valid_visits}")
+            raw = str(row.visit_name).strip()
+            m = VisitName(raw)
+            if m is None:
+                errors.append(f"Invalid Visit Name '{raw}'. Allowed: {[e.value for e in VisitName]}")
+            else:
+                row.visit_name = m.value
 
-        # Sample Type (enum validation)
+        # Sample Type (alias first, then enum)
         if row.sample_type:
-            row.sample_type = str(row.sample_type).strip()
-            valid_samples = [e.value for e in SampleType]
-            if row.sample_type not in valid_samples:
-                errors.append(f"Invalid Sample Type '{row.sample_type}'. Allowed: {valid_samples}")
+            raw = _apply_alias(str(row.sample_type).strip(), _SAMPLE_TYPE_ALIASES)
+            m = SampleType(raw)
+            if m is None:
+                errors.append(f"Invalid Sample Type '{row.sample_type}'. Allowed: {[e.value for e in SampleType]}")
+            else:
+                row.sample_type = m.value
 
-        # Cohort Name (enum validation)
+        # Cohort Name (alias first, then enum)
         if row.cohort_name:
-            row.cohort_name = str(row.cohort_name).strip()
-            valid_cohorts = [e.value for e in CohortName]
-            if row.cohort_name not in valid_cohorts:
-                errors.append(f"Invalid Cohort Name '{row.cohort_name}'. Allowed: {valid_cohorts}")
+            raw = _apply_alias(str(row.cohort_name).strip(), _COHORT_ALIASES)
+            m = CohortName(raw)
+            if m is None:
+                errors.append(f"Invalid Cohort Name '{row.cohort_name}'. Allowed: {[e.value for e in CohortName]}")
+            else:
+                row.cohort_name = m.value
 
         # Visit Code (optional, string)
         if row.visit_code:
@@ -256,10 +309,10 @@ class ExcelImportService:
                 is_cylindrical = not row.shelf_name  # no shelf → cylindrical freezer
 
                 if is_cylindrical:
-                    # Cylindrical path: rack is a plain number 01-13
+                    # Cylindrical path: rack is a plain number 01-13 (may arrive as float e.g. 1.0)
                     rack_str = str(row.rack_drawer_combined).strip()
                     try:
-                        rack_str = f"{int(rack_str):02d}"
+                        rack_str = f"{int(float(rack_str)):02d}"
                         if rack_str not in VALID_CYLINDRICAL_RACKS:
                             errors.append(
                                 f"Cylindrical rack must be 01–13, got '{rack_str}'"
@@ -314,8 +367,8 @@ class ExcelImportService:
         row.errors = errors
 
     def _is_valid_time(self, time_str: str) -> bool:
-        """Check if time_str is valid HH:MM format."""
-        pattern = re.compile(r'^(SCR \(NA\)|M([0-9]|[12][0-9]|3[0-6]))$')
+        """Check if time_str matches visit time codes: SCR, SCR (NA), M0–M36."""
+        pattern = re.compile(r'^(SCR|SCR \(NA\)|M([0-9]|[12][0-9]|3[0-6]))$')
         try:
             if pattern.match(time_str):
                 return True
