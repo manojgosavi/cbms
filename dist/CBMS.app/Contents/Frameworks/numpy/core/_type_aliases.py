@@ -1,1 +1,0 @@
-../../../Resources/numpy/core/_type_aliases.py

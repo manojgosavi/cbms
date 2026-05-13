@@ -3966,6 +3966,7 @@ imported by:
  &#8226;   <a href="#app.ui.dialogs.shipment_dialog">app.ui.dialogs.shipment_dialog</a>
  &#8226;   <a href="#app.ui.dialogs.study_dialog">app.ui.dialogs.study_dialog</a>
  &#8226;   <a href="#app.ui.views.admin_tab">app.ui.views.admin_tab</a>
+ &#8226;   <a href="#app.ui.views.dashboard_tab">app.ui.views.dashboard_tab</a>
  &#8226;   <a href="#app.ui.views.login_view">app.ui.views.login_view</a>
  &#8226;   <a href="#app.ui.views.main_window">app.ui.views.main_window</a>
  &#8226;   <a href="#app.ui.views.participant_tab">app.ui.views.participant_tab</a>
@@ -4013,6 +4014,7 @@ imported by:
     <a href="#PyQt6.QtWidgets">PyQt6.QtWidgets</a>
  &#8226;   <a href="#app.ui.dialogs.excel_import_dialog">app.ui.dialogs.excel_import_dialog</a>
  &#8226;   <a href="#app.ui.views.admin_tab">app.ui.views.admin_tab</a>
+ &#8226;   <a href="#app.ui.views.dashboard_tab">app.ui.views.dashboard_tab</a>
  &#8226;   <a href="#app.ui.views.reports_tab">app.ui.views.reports_tab</a>
  &#8226;   <a href="#app.ui.views.sample_tab">app.ui.views.sample_tab</a>
  &#8226;   <a href="#app.ui.widgets.box_grid_widget">app.ui.widgets.box_grid_widget</a>
@@ -4265,6 +4267,7 @@ imported by:
  &#8226;   <a href="#app.core.services.auth_service">app.core.services.auth_service</a>
  &#8226;   <a href="#app.core.services.blocking_service">app.core.services.blocking_service</a>
  &#8226;   <a href="#app.core.services.catalogue_service">app.core.services.catalogue_service</a>
+ &#8226;   <a href="#app.core.services.dashboard_service">app.core.services.dashboard_service</a>
  &#8226;   <a href="#app.core.services.excel_import_service">app.core.services.excel_import_service</a>
  &#8226;   <a href="#app.core.services.id_generator">app.core.services.id_generator</a>
  &#8226;   <a href="#app.core.services.participant_service">app.core.services.participant_service</a>
@@ -8342,6 +8345,7 @@ imported by:
  &#8226;   <a href="#app.ui.views.admin_tab">app.ui.views.admin_tab</a>
  &#8226;   <a href="#app.ui.views.login_view">app.ui.views.login_view</a>
  &#8226;   <a href="#app.ui.views.main_window">app.ui.views.main_window</a>
+ &#8226;   <a href="#app.ui.views.reports_tab">app.ui.views.reports_tab</a>
  &#8226;   <a href="#app.utils.backup">app.utils.backup</a>
  &#8226;   <a href="#main.py">main.py</a>
 
@@ -8466,6 +8470,7 @@ imported by:
  &#8226;   <a href="#app.core.services.auth_service">app.core.services.auth_service</a>
  &#8226;   <a href="#app.core.services.blocking_service">app.core.services.blocking_service</a>
  &#8226;   <a href="#app.core.services.catalogue_service">app.core.services.catalogue_service</a>
+ &#8226;   <a href="#app.core.services.dashboard_service">app.core.services.dashboard_service</a>
  &#8226;   <a href="#app.core.services.excel_import_service">app.core.services.excel_import_service</a>
  &#8226;   <a href="#app.core.services.id_generator">app.core.services.id_generator</a>
  &#8226;   <a href="#app.core.services.participant_service">app.core.services.participant_service</a>
@@ -8634,6 +8639,7 @@ imported by:
  &#8226;   <a href="#app.core.services.auth_service">app.core.services.auth_service</a>
  &#8226;   <a href="#app.core.services.blocking_service">app.core.services.blocking_service</a>
  &#8226;   <a href="#app.core.services.catalogue_service">app.core.services.catalogue_service</a>
+ &#8226;   <a href="#app.core.services.dashboard_service">app.core.services.dashboard_service</a>
  &#8226;   <a href="#app.core.services.excel_import_service">app.core.services.excel_import_service</a>
  &#8226;   <a href="#app.core.services.id_generator">app.core.services.id_generator</a>
  &#8226;   <a href="#app.core.services.participant_service">app.core.services.participant_service</a>
@@ -8786,6 +8792,28 @@ imported by:
 </div>
 
 <div class="node">
+  <a name="app.core.services.dashboard_service"></a>
+  <a target="code" href="/Users/manojgosavi/Downloads/cbms_with_excel_import_clean/app/core/services/dashboard_service.py" type="text/plain"><tt>app.core.services.dashboard_service</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#__future__">__future__</a>
+ &#8226;   <a href="#app.core.models.models">app.core.models.models</a>
+ &#8226;   <a href="#app.core.services">app.core.services</a>
+ &#8226;   <a href="#collections">collections</a>
+ &#8226;   <a href="#sqlalchemy">sqlalchemy</a>
+ &#8226;   <a href="#sqlalchemy.orm">sqlalchemy.orm</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#app.ui.views.dashboard_tab">app.ui.views.dashboard_tab</a>
+
+  </div>
+
+</div>
+
+<div class="node">
   <a name="app.core.services.excel_import_service"></a>
   <a target="code" href="/Users/manojgosavi/Downloads/cbms_with_excel_import_clean/app/core/services/excel_import_service.py" type="text/plain"><tt>app.core.services.excel_import_service</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
@@ -8803,7 +8831,6 @@ imports:
  &#8226;   <a href="#pathlib">pathlib</a>
  &#8226;   <a href="#re">re</a>
  &#8226;   <a href="#sqlalchemy.orm">sqlalchemy.orm</a>
- &#8226;   <a href="#traceback">traceback</a>
  &#8226;   <a href="#typing">typing</a>
 
   </div>
@@ -9576,17 +9603,17 @@ imported by:
   <a target="code" href="/Users/manojgosavi/Downloads/cbms_with_excel_import_clean/app/ui/views/dashboard_tab.py" type="text/plain"><tt>app.ui.views.dashboard_tab</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
-    <a href="#PyQt6.QtWidgets">PyQt6.QtWidgets</a>
+    <a href="#PyQt6.QtCore">PyQt6.QtCore</a>
+ &#8226;   <a href="#PyQt6.QtGui">PyQt6.QtGui</a>
+ &#8226;   <a href="#PyQt6.QtWidgets">PyQt6.QtWidgets</a>
  &#8226;   <a href="#__future__">__future__</a>
  &#8226;   <a href="#app.core.models.database">app.core.models.database</a>
  &#8226;   <a href="#app.core.models.models">app.core.models.models</a>
+ &#8226;   <a href="#app.core.services.dashboard_service">app.core.services.dashboard_service</a>
  &#8226;   <a href="#app.core.services.study_service">app.core.services.study_service</a>
  &#8226;   <a href="#app.ui.views">app.ui.views</a>
- &#8226;   <a href="#matplotlib">matplotlib</a>
- &#8226;   <a href="#matplotlib.backends.backend_qtagg">matplotlib.backends.backend_qtagg</a>
- &#8226;   <a href="#matplotlib.figure">matplotlib.figure</a>
- &#8226;   <a href="#sqlalchemy">sqlalchemy</a>
- &#8226;   <a href="#traceback">traceback</a>
+ &#8226;   <a href="#dataclasses">dataclasses</a>
+ &#8226;   <a href="#typing">typing</a>
 
   </div>
   <div class="import">
@@ -9692,6 +9719,7 @@ imports:
  &#8226;   <a href="#PyQt6.QtGui">PyQt6.QtGui</a>
  &#8226;   <a href="#PyQt6.QtWidgets">PyQt6.QtWidgets</a>
  &#8226;   <a href="#__future__">__future__</a>
+ &#8226;   <a href="#app.config">app.config</a>
  &#8226;   <a href="#app.core.models.database">app.core.models.database</a>
  &#8226;   <a href="#app.core.services.catalogue_service">app.core.services.catalogue_service</a>
  &#8226;   <a href="#app.core.services.study_service">app.core.services.study_service</a>
@@ -11651,6 +11679,7 @@ imported by:
  &#8226;   <a href="#altgraph.Graph">altgraph.Graph</a>
  &#8226;   <a href="#altgraph.GraphUtil">altgraph.GraphUtil</a>
  &#8226;   <a href="#app.core.services.catalogue_service">app.core.services.catalogue_service</a>
+ &#8226;   <a href="#app.core.services.dashboard_service">app.core.services.dashboard_service</a>
  &#8226;   <a href="#ast">ast</a>
  &#8226;   <a href="#asyncio.base_events">asyncio.base_events</a>
  &#8226;   <a href="#asyncio.base_subprocess">asyncio.base_subprocess</a>
@@ -12835,6 +12864,7 @@ imported by:
  &#8226;   <a href="#app.core.services.catalogue_service">app.core.services.catalogue_service</a>
  &#8226;   <a href="#app.core.services.excel_import_service">app.core.services.excel_import_service</a>
  &#8226;   <a href="#app.core.services.search_service">app.core.services.search_service</a>
+ &#8226;   <a href="#app.ui.views.dashboard_tab">app.ui.views.dashboard_tab</a>
  &#8226;   <a href="#app.ui.widgets.box_grid_widget">app.ui.widgets.box_grid_widget</a>
  &#8226;   <a href="#matplotlib._text_helpers">matplotlib._text_helpers</a>
  &#8226;   <a href="#matplotlib.font_manager">matplotlib.font_manager</a>
@@ -17561,7 +17591,6 @@ imports:
  &#8226;   <a href="#importlib">importlib</a>
  &#8226;   <a href="#importlib._bootstrap">importlib._bootstrap</a>
  &#8226;   <a href="#importlib._bootstrap_external">importlib._bootstrap_external</a>
- &#8226;   <a href="#importlib.machinery">importlib.machinery</a>
  &#8226;   <a href="#sys">sys</a>
  &#8226;   <a href="#warnings">warnings</a>
 
@@ -17729,7 +17758,6 @@ imported by:
  &#8226;   <a href="#_pytest.assertion.rewrite">_pytest.assertion.rewrite</a>
  &#8226;   <a href="#_pytest.pathlib">_pytest.pathlib</a>
  &#8226;   <a href="#ctypes.util">ctypes.util</a>
- &#8226;   <a href="#importlib">importlib</a>
  &#8226;   <a href="#importlib.abc">importlib.abc</a>
  &#8226;   <a href="#inspect">inspect</a>
  &#8226;   <a href="#numpy.compat.py3k">numpy.compat.py3k</a>
@@ -19363,8 +19391,7 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#app.ui.views.dashboard_tab">app.ui.views.dashboard_tab</a>
- &#8226;   <a href="#main.py">main.py</a>
+    <a href="#main.py">main.py</a>
  &#8226;   <a href="#matplotlib">matplotlib</a>
  &#8226;   <a href="#matplotlib._afm">matplotlib._afm</a>
  &#8226;   <a href="#matplotlib._api">matplotlib._api</a>
@@ -19400,6 +19427,7 @@ imported by:
  &#8226;   <a href="#matplotlib.backend_tools">matplotlib.backend_tools</a>
  &#8226;   <a href="#matplotlib.backends">matplotlib.backends</a>
  &#8226;   <a href="#matplotlib.backends.backend_agg">matplotlib.backends.backend_agg</a>
+ &#8226;   <a href="#matplotlib.backends.backend_macosx">matplotlib.backends.backend_macosx</a>
  &#8226;   <a href="#matplotlib.backends.backend_qt">matplotlib.backends.backend_qt</a>
  &#8226;   <a href="#matplotlib.backends.backend_webagg">matplotlib.backends.backend_webagg</a>
  &#8226;   <a href="#matplotlib.backends.backend_webagg_core">matplotlib.backends.backend_webagg_core</a>
@@ -19527,6 +19555,7 @@ imported by:
  &#8226;   <a href="#matplotlib.backend_managers">matplotlib.backend_managers</a>
  &#8226;   <a href="#matplotlib.backend_tools">matplotlib.backend_tools</a>
  &#8226;   <a href="#matplotlib.backends.backend_agg">matplotlib.backends.backend_agg</a>
+ &#8226;   <a href="#matplotlib.backends.backend_macosx">matplotlib.backends.backend_macosx</a>
  &#8226;   <a href="#matplotlib.backends.backend_qt">matplotlib.backends.backend_qt</a>
  &#8226;   <a href="#matplotlib.backends.backend_webagg_core">matplotlib.backends.backend_webagg_core</a>
  &#8226;   <a href="#matplotlib.backends.qt_editor._formlayout">matplotlib.backends.qt_editor._formlayout</a>
@@ -19928,6 +19957,7 @@ imports:
 imported by:
     <a href="#matplotlib.backend_bases">matplotlib.backend_bases</a>
  &#8226;   <a href="#matplotlib.backend_tools">matplotlib.backend_tools</a>
+ &#8226;   <a href="#matplotlib.backends.backend_macosx">matplotlib.backends.backend_macosx</a>
  &#8226;   <a href="#matplotlib.backends.backend_qt">matplotlib.backends.backend_qt</a>
  &#8226;   <a href="#matplotlib.backends.backend_webagg">matplotlib.backends.backend_webagg</a>
  &#8226;   <a href="#matplotlib.figure">matplotlib.figure</a>
@@ -20351,6 +20381,7 @@ imported by:
     <a href="#matplotlib.artist">matplotlib.artist</a>
  &#8226;   <a href="#matplotlib.backend_tools">matplotlib.backend_tools</a>
  &#8226;   <a href="#matplotlib.backends.backend_agg">matplotlib.backends.backend_agg</a>
+ &#8226;   <a href="#matplotlib.backends.backend_macosx">matplotlib.backends.backend_macosx</a>
  &#8226;   <a href="#matplotlib.backends.backend_qt">matplotlib.backends.backend_qt</a>
  &#8226;   <a href="#matplotlib.backends.backend_webagg">matplotlib.backends.backend_webagg</a>
  &#8226;   <a href="#matplotlib.backends.backend_webagg_core">matplotlib.backends.backend_webagg_core</a>
@@ -20424,8 +20455,9 @@ imported by:
 imports:
     <a href="#matplotlib">matplotlib</a>
  &#8226;   <a href="#matplotlib.backends">matplotlib.backends</a>
+ &#8226;   <a href="#matplotlib.backends._macosx">matplotlib.backends._macosx</a>
  &#8226;   <a href="#matplotlib.backends.backend_agg">matplotlib.backends.backend_agg</a>
- &#8226;   <a href="#matplotlib.backends.backend_qtagg">matplotlib.backends.backend_qtagg</a>
+ &#8226;   <a href="#matplotlib.backends.backend_macosx">matplotlib.backends.backend_macosx</a>
  &#8226;   <a href="#matplotlib.backends.backend_webagg">matplotlib.backends.backend_webagg</a>
  &#8226;   <a href="#matplotlib.backends.backend_webagg_core">matplotlib.backends.backend_webagg_core</a>
  &#8226;   <a href="#matplotlib.backends.registry">matplotlib.backends.registry</a>
@@ -20435,7 +20467,9 @@ imports:
 imported by:
     <a href="#matplotlib.backends">matplotlib.backends</a>
  &#8226;   <a href="#matplotlib.backends._backend_agg">matplotlib.backends._backend_agg</a>
+ &#8226;   <a href="#matplotlib.backends._macosx">matplotlib.backends._macosx</a>
  &#8226;   <a href="#matplotlib.backends.backend_agg">matplotlib.backends.backend_agg</a>
+ &#8226;   <a href="#matplotlib.backends.backend_macosx">matplotlib.backends.backend_macosx</a>
  &#8226;   <a href="#matplotlib.backends.backend_qt">matplotlib.backends.backend_qt</a>
  &#8226;   <a href="#matplotlib.backends.backend_qtagg">matplotlib.backends.backend_qtagg</a>
  &#8226;   <a href="#matplotlib.backends.backend_webagg">matplotlib.backends.backend_webagg</a>
@@ -20468,6 +20502,22 @@ imported by:
 </div>
 
 <div class="node">
+  <a name="matplotlib.backends._macosx"></a>
+  <tt>matplotlib.backends._macosx</tt> <span class="moduletype"><tt>/Users/manojgosavi/Downloads/cbms_with_excel_import_clean/venv/lib/python3.12/site-packages/matplotlib/backends/_macosx.cpython-312-darwin.so</tt></span>  <div class="import">
+imports:
+    <a href="#matplotlib.backends">matplotlib.backends</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#matplotlib.backends">matplotlib.backends</a>
+ &#8226;   <a href="#matplotlib.backends.backend_macosx">matplotlib.backends.backend_macosx</a>
+
+  </div>
+
+</div>
+
+<div class="node">
   <a name="matplotlib.backends.backend_agg"></a>
   <a target="code" href="/Users/manojgosavi/Downloads/cbms_with_excel_import_clean/venv/lib/python3.12/site-packages/matplotlib/backends/backend_agg.py" type="text/plain"><tt>matplotlib.backends.backend_agg</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
@@ -20492,9 +20542,34 @@ imports:
 imported by:
     <a href="#main.py">main.py</a>
  &#8226;   <a href="#matplotlib.backends">matplotlib.backends</a>
+ &#8226;   <a href="#matplotlib.backends.backend_macosx">matplotlib.backends.backend_macosx</a>
  &#8226;   <a href="#matplotlib.backends.backend_qtagg">matplotlib.backends.backend_qtagg</a>
  &#8226;   <a href="#matplotlib.backends.backend_webagg_core">matplotlib.backends.backend_webagg_core</a>
  &#8226;   <a href="#matplotlib.mathtext">matplotlib.mathtext</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="matplotlib.backends.backend_macosx"></a>
+  <a target="code" href="/Users/manojgosavi/Downloads/cbms_with_excel_import_clean/venv/lib/python3.12/site-packages/matplotlib/backends/backend_macosx.py" type="text/plain"><tt>matplotlib.backends.backend_macosx</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#matplotlib">matplotlib</a>
+ &#8226;   <a href="#matplotlib._api">matplotlib._api</a>
+ &#8226;   <a href="#matplotlib._pylab_helpers">matplotlib._pylab_helpers</a>
+ &#8226;   <a href="#matplotlib.backend_bases">matplotlib.backend_bases</a>
+ &#8226;   <a href="#matplotlib.backends">matplotlib.backends</a>
+ &#8226;   <a href="#matplotlib.backends._macosx">matplotlib.backends._macosx</a>
+ &#8226;   <a href="#matplotlib.backends.backend_agg">matplotlib.backends.backend_agg</a>
+ &#8226;   <a href="#matplotlib.cbook">matplotlib.cbook</a>
+ &#8226;   <a href="#os">os</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#matplotlib.backends">matplotlib.backends</a>
 
   </div>
 
@@ -20543,9 +20618,7 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#app.ui.views.dashboard_tab">app.ui.views.dashboard_tab</a>
- &#8226;   <a href="#main.py">main.py</a>
- &#8226;   <a href="#matplotlib.backends">matplotlib.backends</a>
+    <a href="#main.py">main.py</a>
 
   </div>
 
@@ -20840,6 +20913,7 @@ imported by:
  &#8226;   <a href="#matplotlib.backend_managers">matplotlib.backend_managers</a>
  &#8226;   <a href="#matplotlib.backend_tools">matplotlib.backend_tools</a>
  &#8226;   <a href="#matplotlib.backends.backend_agg">matplotlib.backends.backend_agg</a>
+ &#8226;   <a href="#matplotlib.backends.backend_macosx">matplotlib.backends.backend_macosx</a>
  &#8226;   <a href="#matplotlib.backends.backend_qt">matplotlib.backends.backend_qt</a>
  &#8226;   <a href="#matplotlib.backends.qt_editor.figureoptions">matplotlib.backends.qt_editor.figureoptions</a>
  &#8226;   <a href="#matplotlib.cm">matplotlib.cm</a>
@@ -21210,8 +21284,7 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#app.ui.views.dashboard_tab">app.ui.views.dashboard_tab</a>
- &#8226;   <a href="#matplotlib.backend_bases">matplotlib.backend_bases</a>
+    <a href="#matplotlib.backend_bases">matplotlib.backend_bases</a>
  &#8226;   <a href="#matplotlib.font_manager">matplotlib.font_manager</a>
  &#8226;   <a href="#matplotlib.image">matplotlib.image</a>
  &#8226;   <a href="#matplotlib.legend">matplotlib.legend</a>
@@ -40797,6 +40870,7 @@ imported by:
  &#8226;   <a href="#matplotlib">matplotlib</a>
  &#8226;   <a href="#matplotlib._mathtext">matplotlib._mathtext</a>
  &#8226;   <a href="#matplotlib.backend_bases">matplotlib.backend_bases</a>
+ &#8226;   <a href="#matplotlib.backends.backend_macosx">matplotlib.backends.backend_macosx</a>
  &#8226;   <a href="#matplotlib.backends.backend_qt">matplotlib.backends.backend_qt</a>
  &#8226;   <a href="#matplotlib.backends.backend_webagg_core">matplotlib.backends.backend_webagg_core</a>
  &#8226;   <a href="#matplotlib.backends.qt_compat">matplotlib.backends.qt_compat</a>
@@ -47455,8 +47529,8 @@ imported by:
     <a href="#app.core.models.database">app.core.models.database</a>
  &#8226;   <a href="#app.core.models.models">app.core.models.models</a>
  &#8226;   <a href="#app.core.repositories.participant_repository">app.core.repositories.participant_repository</a>
+ &#8226;   <a href="#app.core.services.dashboard_service">app.core.services.dashboard_service</a>
  &#8226;   <a href="#app.core.services.search_service">app.core.services.search_service</a>
- &#8226;   <a href="#app.ui.views.dashboard_tab">app.ui.views.dashboard_tab</a>
  &#8226;   <a href="#sqlalchemy">sqlalchemy</a>
  &#8226;   <a href="#sqlalchemy.connectors">sqlalchemy.connectors</a>
  &#8226;   <a href="#sqlalchemy.connectors.aioodbc">sqlalchemy.connectors.aioodbc</a>
@@ -50970,6 +51044,7 @@ imported by:
  &#8226;   <a href="#app.core.services.auth_service">app.core.services.auth_service</a>
  &#8226;   <a href="#app.core.services.blocking_service">app.core.services.blocking_service</a>
  &#8226;   <a href="#app.core.services.catalogue_service">app.core.services.catalogue_service</a>
+ &#8226;   <a href="#app.core.services.dashboard_service">app.core.services.dashboard_service</a>
  &#8226;   <a href="#app.core.services.excel_import_service">app.core.services.excel_import_service</a>
  &#8226;   <a href="#app.core.services.id_generator">app.core.services.id_generator</a>
  &#8226;   <a href="#app.core.services.participant_service">app.core.services.participant_service</a>
@@ -56787,8 +56862,6 @@ imported by:
  &#8226;   <a href="#_pytest.threadexception">_pytest.threadexception</a>
  &#8226;   <a href="#_pytest.unittest">_pytest.unittest</a>
  &#8226;   <a href="#_pytest.unraisableexception">_pytest.unraisableexception</a>
- &#8226;   <a href="#app.core.services.excel_import_service">app.core.services.excel_import_service</a>
- &#8226;   <a href="#app.ui.views.dashboard_tab">app.ui.views.dashboard_tab</a>
  &#8226;   <a href="#app.utils.exception_handler">app.utils.exception_handler</a>
  &#8226;   <a href="#asyncio.base_events">asyncio.base_events</a>
  &#8226;   <a href="#asyncio.base_tasks">asyncio.base_tasks</a>
@@ -57168,6 +57241,7 @@ imported by:
  &#8226;   <a href="#app.core.services.auth_service">app.core.services.auth_service</a>
  &#8226;   <a href="#app.core.services.blocking_service">app.core.services.blocking_service</a>
  &#8226;   <a href="#app.core.services.catalogue_service">app.core.services.catalogue_service</a>
+ &#8226;   <a href="#app.core.services.dashboard_service">app.core.services.dashboard_service</a>
  &#8226;   <a href="#app.core.services.excel_import_service">app.core.services.excel_import_service</a>
  &#8226;   <a href="#app.core.services.participant_service">app.core.services.participant_service</a>
  &#8226;   <a href="#app.core.services.sample_service">app.core.services.sample_service</a>
@@ -57180,6 +57254,7 @@ imported by:
  &#8226;   <a href="#app.ui.dialogs.move_aliquot_dialog">app.ui.dialogs.move_aliquot_dialog</a>
  &#8226;   <a href="#app.ui.dialogs.place_aliquot_dialog">app.ui.dialogs.place_aliquot_dialog</a>
  &#8226;   <a href="#app.ui.dialogs.shipment_dialog">app.ui.dialogs.shipment_dialog</a>
+ &#8226;   <a href="#app.ui.views.dashboard_tab">app.ui.views.dashboard_tab</a>
  &#8226;   <a href="#app.ui.views.reports_tab">app.ui.views.reports_tab</a>
  &#8226;   <a href="#app.ui.views.sample_tab">app.ui.views.sample_tab</a>
  &#8226;   <a href="#app.ui.views.search_tab">app.ui.views.search_tab</a>

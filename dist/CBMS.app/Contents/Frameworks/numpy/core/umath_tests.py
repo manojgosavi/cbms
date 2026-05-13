@@ -1,1 +1,0 @@
-../../../Resources/numpy/core/umath_tests.py

@@ -1,1 +1,0 @@
-../../../Resources/numpy/core/_methods.py

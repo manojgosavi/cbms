@@ -136,6 +136,11 @@ class BoxGridWidget(QWidget):
         self._selected_cell = None
         self.update()
 
+    def select_cell(self, row: int, col: int) -> None:
+        """Programmatically select a cell (e.g. when navigating from Search tab)."""
+        self._selected_cell = (row, col)
+        self.update()
+
     # ── Size helpers ───────────────────────────────────────────────────────
 
     def _update_size(self) -> None:

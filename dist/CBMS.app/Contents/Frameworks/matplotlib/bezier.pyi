@@ -1,1 +1,0 @@
-../../Resources/matplotlib/bezier.pyi

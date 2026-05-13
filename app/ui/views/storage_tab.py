@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
 )
 
 from app.core.models.database import get_session
+from app.core.models.models import AliquotLocation, BoxPosition
 from app.core.services.storage_service import StorageService
 from app.ui.widgets.box_grid_widget import BoxGridWidget, CellData
 from app.utils.exception_handler import slot_safe
@@ -596,6 +597,60 @@ class StorageTab(QWidget):
             QMessageBox.warning(self, "Error", msg)
 
     @slot_safe
+    # ── Cross-tab navigation ───────────────────────────────────────────────
+
+    def navigate_to_aliquot(self, aliquot_db_id: int) -> None:
+        """Switch tree selection and box grid to the cell holding this aliquot."""
+        with get_session() as session:
+            loc = (
+                session.query(AliquotLocation)
+                .filter(AliquotLocation.aliquot_id == aliquot_db_id)
+                .first()
+            )
+            if not loc:
+                QMessageBox.information(
+                    self, "No Location",
+                    "No storage location is recorded for this aliquot."
+                )
+                return
+            pos = session.query(BoxPosition).filter(BoxPosition.id == loc.position_id).first()
+            if not pos:
+                QMessageBox.information(
+                    self, "No Location",
+                    "No storage location is recorded for this aliquot."
+                )
+                return
+            box_id = pos.box_id
+            row    = pos.row
+            col    = pos.col
+
+        # Walk the tree to find the matching box node
+        box_item = self._find_tree_item("box", box_id)
+        if box_item:
+            self._tree.setCurrentItem(box_item)
+            self._tree.scrollToItem(box_item)
+
+        self._load_box_grid(box_id)
+        self._grid.select_cell(row, col)
+
+    def _find_tree_item(self, kind: str, item_id: int):
+        """Recursively search the tree for a node with UserRole data (kind, item_id)."""
+        def _search(item):
+            data = item.data(0, Qt.ItemDataRole.UserRole)
+            if data and data[0] == kind and data[1] == item_id:
+                return item
+            for i in range(item.childCount()):
+                result = _search(item.child(i))
+                if result:
+                    return result
+            return None
+
+        for i in range(self._tree.topLevelItemCount()):
+            result = _search(self._tree.topLevelItem(i))
+            if result:
+                return result
+        return None
+
     def _on_remove_aliquot(self):
         selected = self._grid.get_selected_cell()
         if not selected:

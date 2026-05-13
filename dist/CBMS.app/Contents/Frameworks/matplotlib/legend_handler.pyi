@@ -1,1 +1,0 @@
-../../Resources/matplotlib/legend_handler.pyi
