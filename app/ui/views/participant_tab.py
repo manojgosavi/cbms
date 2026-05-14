@@ -68,12 +68,17 @@ class ParticipantTab(QWidget):
         self._btn_edit.setEnabled(False)
         self._btn_edit.clicked.connect(self._on_edit)
 
+        self._btn_export = QPushButton("📤  Export to Excel")
+        self._btn_export.setEnabled(False)
+        self._btn_export.clicked.connect(self._on_export)
+
         self._lbl_count = QLabel("0 participants")
         self._lbl_count.setStyleSheet("color: grey;")
 
         toolbar.addWidget(self._btn_new)
         toolbar.addWidget(self._btn_import)
         toolbar.addWidget(self._btn_edit)
+        toolbar.addWidget(self._btn_export)
         toolbar.addStretch()
         toolbar.addWidget(self._lbl_count)
         layout.addLayout(toolbar)
@@ -163,6 +168,7 @@ class ParticipantTab(QWidget):
 
         study_map = {sid: short for sid, short in self._studies}
 
+        self._table.setSortingEnabled(False)
         self._table.setRowCount(len(data))
         for row_idx, row_data in enumerate(data):
             display = list(row_data[:-1])
@@ -175,11 +181,79 @@ class ParticipantTab(QWidget):
 
             self._table.item(row_idx, 0).setData(Qt.ItemDataRole.UserRole, row_data[-1])
 
+        self._table.setSortingEnabled(True)
+        self._btn_export.setEnabled(total > 0)
         self._lbl_count.setText(
             f"{total} participant{'s' if total != 1 else ''}  "
             f"(showing {len(data)})"
         )
         self._pagination.set_page(self._page, total, PAGE_SIZE)
+
+    @slot_safe
+    def _on_export(self):
+        from PyQt6.QtWidgets import QFileDialog, QMessageBox
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Export Participants", "", "Excel Files (*.xlsx)"
+        )
+        if not file_path:
+            return
+
+        filters = {}
+        study_id = self._study_filter.currentData()
+        if study_id:
+            filters["study_id"] = study_id
+        pid_text = self._pid_search.text().strip()
+        if pid_text:
+            filters["pid_like"] = pid_text
+
+        with get_session() as session:
+            service = ParticipantService(session)
+            participants, _ = service.search(filters, page=1, page_size=9999)
+            study_map = {sid: short for sid, short in self._studies}
+            rows = [
+                (
+                    p.pid,
+                    study_map.get(p.study_id, str(p.study_id)),
+                    p.age or "",
+                    p.gender or "",
+                    p.population or "",
+                    p.disease or "",
+                    p.site_name or "",
+                    p.cohort_name or "",
+                    ", ".join(sorted(set(s.visit_code for s in p.samples if s.visit_code))),
+                    p.notes or "",
+                    str(p.created_at.date()) if p.created_at else "",
+                )
+                for p in participants
+            ]
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Participants"
+
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        for col_idx, col_name in enumerate(self.COLUMNS, 1):
+            cell = ws.cell(row=1, column=col_idx, value=col_name)
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal="center")
+
+        for row_idx, row in enumerate(rows, 2):
+            for col_idx, val in enumerate(row, 1):
+                ws.cell(row=row_idx, column=col_idx, value=val)
+
+        for col in ws.columns:
+            max_len = max((len(str(c.value or "")) for c in col), default=10)
+            ws.column_dimensions[col[0].column_letter].width = min(max_len + 2, 50)
+
+        wb.save(file_path)
+        QMessageBox.information(
+            self, "Export complete",
+            f"Exported {len(rows)} participant(s) to:\n{file_path}"
+        )
 
     @slot_safe
     def _on_new(self):
