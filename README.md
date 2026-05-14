@@ -186,12 +186,26 @@ Supported box sizes: 9×9, 10×10, 8×12, 6×6.
 
 ## Building a Distributable
 
+### macOS
 ```bash
-# macOS
-python build.py        # or: pyinstaller CBMS.spec
+chmod +x install_and_build.sh
+./install_and_build.sh
+```
+Produces:
+- `dist/CBMS.app` — the app bundle
+- `dist/CBMS-v1.0.0.dmg` — drag-and-drop disk image for distribution
 
-# Windows
+### Windows
+```bat
 install_and_build.bat
 ```
+Produces `dist\CBMS.exe` (single-file, default).  
+Use `install_and_build.bat --onedir` for a folder build instead.
 
-See `MAC_BUILD_INSTRUCTIONS.md` for macOS-specific signing / notarization notes.
+### Development (no build)
+```bash
+source venv/bin/activate   # Windows: venv\Scripts\activate
+python main.py
+```
+
+See `MAC_BUILD_INSTRUCTIONS.md` for Gatekeeper bypass and troubleshooting.

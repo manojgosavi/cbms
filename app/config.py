@@ -40,7 +40,7 @@ DATABASE_URL = f"sqlite:///{DB_PATH.as_posix()}"
 
 # ── Application meta ───────────────────────────────────────────────────────
 APP_NAME    = "CBMS"
-APP_VERSION = "0.1.0"
+APP_VERSION = "1.0.0"
 APP_TITLE   = "Central Biorepository Management Software"
 
 # ── Sample ID format ───────────────────────────────────────────────────────

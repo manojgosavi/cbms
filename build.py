@@ -2,44 +2,92 @@
 CBMS build script — produces a standalone executable using PyInstaller.
 
 Usage:
-  python build.py            # auto-detects platform
+  python build.py            # auto-detects platform; onedir on macOS/Linux, onefile on Windows
   python build.py --onefile  # single-file bundle (slower startup, easier to share)
+  python build.py --onedir   # folder output (fast startup)
 
 Output:
-  dist/CBMS/          (folder mode — fast startup, recommended)
-  dist/CBMS.exe       (Windows single-file mode)
-  dist/CBMS.app       (macOS app bundle)
-
-Key concept — PyInstaller:
-  PyInstaller analyses your imports and bundles Python + all dependencies
-  into a folder or single executable. The user needs no Python installed.
-
-  --hidden-import: modules PyInstaller misses because they're imported
-    dynamically (e.g. via __import__() or importlib).
-  --add-data: non-Python files (icons, themes) that must be included.
-  --windowed: suppresses the terminal window on Windows/macOS (GUI apps).
-  --onefile: single .exe/.app (convenient but slower startup due to unpacking).
+  macOS:   dist/CBMS.app  +  dist/CBMS-v<version>.dmg
+  Windows: dist/CBMS.exe  (onefile default)
+  Linux:   dist/CBMS/     (onedir default)
 """
 
 import os
 import platform
+import shutil
 import subprocess
 import sys
 
 
-def build(onefile: bool = False):
-    system  = platform.system()
-    is_mac  = system == "Darwin"
-    is_win  = system == "Windows"
+def _get_version() -> str:
+    try:
+        from app.config import APP_VERSION
+        return APP_VERSION
+    except Exception:
+        return "1.0.0"
+
+
+def create_dmg(version: str) -> None:
+    """Create a distributable DMG from dist/CBMS.app using hdiutil."""
+    app_path = "dist/CBMS.app"
+    if not os.path.exists(app_path):
+        print("[CBMS Build] Skipping DMG — dist/CBMS.app not found.")
+        return
+
+    staging = "dist/dmg_staging"
+    dmg_path = f"dist/CBMS-v{version}.dmg"
+
+    print(f"\n[CBMS Build] Creating DMG: {dmg_path}")
+
+    # Clean up any leftover staging dir
+    if os.path.exists(staging):
+        shutil.rmtree(staging)
+    os.makedirs(staging)
+
+    # Copy app into staging
+    shutil.copytree(app_path, os.path.join(staging, "CBMS.app"))
+
+    # Symlink to /Applications so users can drag-and-drop
+    os.symlink("/Applications", os.path.join(staging, "Applications"))
+
+    # Remove old DMG if it exists (hdiutil won't overwrite)
+    if os.path.exists(dmg_path):
+        os.remove(dmg_path)
+
+    result = subprocess.run([
+        "hdiutil", "create",
+        "-srcfolder", staging,
+        "-volname", "CBMS",
+        "-format", "UDZO",
+        "-imagekey", "zlib-level=9",
+        "-o", dmg_path,
+    ])
+
+    # Clean up staging dir
+    shutil.rmtree(staging)
+
+    if result.returncode == 0:
+        print(f"[CBMS Build] DMG created: {dmg_path}")
+    else:
+        print("[CBMS Build] DMG creation failed — hdiutil error above.")
+
+
+def build(onefile: bool = False, onedir: bool = False):
+    system = platform.system()
+    is_mac = system == "Darwin"
+    is_win = system == "Windows"
+    version = _get_version()
+
+    # Default mode: onefile on Windows, onedir on macOS/Linux
+    if not onefile and not onedir:
+        onefile = is_win
 
     args = [
         sys.executable, "-m", "PyInstaller",
         "--name", "CBMS",
         "--clean",
         "--noconfirm",
-        # suppress terminal window on GUI platforms
         "--windowed" if (is_mac or is_win) else "--console",
-        # hidden imports PyInstaller often misses
         "--hidden-import", "sqlalchemy.dialects.sqlite",
         "--hidden-import", "bcrypt",
         "--hidden-import", "openpyxl",
@@ -47,52 +95,49 @@ def build(onefile: bool = False):
         "--hidden-import", "matplotlib.backends.backend_agg",
         "--hidden-import", "matplotlib",
         "--hidden-import", "PyQt6.sip",
-        # matplotlib bundles data files (fonts, styles, backends) that
-        # PyInstaller won't find automatically — must be added explicitly.
         "--add-data", f"{__import__('matplotlib').get_data_path()}{os.pathsep}matplotlib/mpl-data",
         "--collect-data", "matplotlib",
-        # numpy 2.x restructured internal modules — collect-all is required
-        # otherwise numpy._core._exceptions and similar are missing in the bundle
         "--collect-all", "numpy",
-        # include non-Python data files
         "--add-data", f"resources{os.pathsep}resources",
     ]
 
-    if onefile:
-        args.append("--onefile")
-    else:
-        args.append("--onedir")
+    args.append("--onefile" if onefile else "--onedir")
 
-    # macOS: set icon (.icns), Windows: set icon (.ico)
     icon_path = None
     if is_mac and os.path.exists("resources/icons/cbms.icns"):
         icon_path = "resources/icons/cbms.icns"
     elif is_win and os.path.exists("resources/icons/cbms.ico"):
         icon_path = "resources/icons/cbms.ico"
-
     if icon_path:
         args += ["--icon", icon_path]
 
     args.append("main.py")
 
-    print(f"[CBMS Build] Platform: {system}")
-    print(f"[CBMS Build] Mode: {'onefile' if onefile else 'onedir'}")
-    print(f"[CBMS Build] Running: {' '.join(args)}\n")
+    print(f"[CBMS Build] Platform : {system}")
+    print(f"[CBMS Build] Version  : {version}")
+    print(f"[CBMS Build] Mode     : {'onefile' if onefile else 'onedir'}")
+    print(f"[CBMS Build] Running  : {' '.join(args)}\n")
 
     result = subprocess.run(args)
 
-    if result.returncode == 0:
-        print("\n[CBMS Build] Build successful!")
-        if onefile:
-            ext = ".exe" if is_win else ""
-            print(f"  Executable: dist/CBMS{ext}")
-        else:
-            print(f"  Output folder: dist/CBMS/")
-    else:
+    if result.returncode != 0:
         print("\n[CBMS Build] Build failed — see output above.")
         sys.exit(1)
+
+    print("\n[CBMS Build] Build successful!")
+    if onefile:
+        ext = ".exe" if is_win else ""
+        print(f"  Executable : dist/CBMS{ext}")
+    else:
+        if is_mac:
+            print(f"  App bundle : dist/CBMS.app")
+            create_dmg(version)
+            print(f"  DMG        : dist/CBMS-v{version}.dmg")
+        else:
+            print(f"  Folder     : dist/CBMS/")
 
 
 if __name__ == "__main__":
     onefile = "--onefile" in sys.argv
-    build(onefile=onefile)
+    onedir  = "--onedir"  in sys.argv
+    build(onefile=onefile, onedir=onedir)
