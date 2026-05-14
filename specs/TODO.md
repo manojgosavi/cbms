@@ -38,3 +38,4 @@
 - ~~Add pagination whereever necessary.~~ ✓ done
 - ~~Any other improvement that is currently missing and should be implemented.~~ ✓ done (export from participant tab, sortable columns, last backup indicator)
 - ~~Any improvement on building & installing the app.~~ ✓ done (macOS DMG via hdiutil, Windows onefile EXE default, version bumped to 1.0.0)
+- Add logout / switch-user functionality (revisit when ready).
