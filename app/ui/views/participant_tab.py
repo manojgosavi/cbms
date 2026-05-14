@@ -14,7 +14,10 @@ from PyQt6.QtWidgets import (
 from app.core.models.database import get_session
 from app.core.services.study_service import StudyService
 from app.core.services.participant_service import ParticipantService
+from app.ui.widgets.pagination_bar import PaginationBar
 from app.utils.exception_handler import slot_safe
+
+PAGE_SIZE = 100
 
 
 class ParticipantTab(QWidget):
@@ -24,7 +27,8 @@ class ParticipantTab(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._studies = []    # cached list of (id, short_id) for the filter dropdown
+        self._studies = []
+        self._page = 1
         self._build_ui()
         self.refresh()
 
@@ -37,12 +41,12 @@ class ParticipantTab(QWidget):
 
         self._study_filter = QComboBox()
         self._study_filter.addItem("All Studies", None)
-        self._study_filter.currentIndexChanged.connect(self.refresh)
+        self._study_filter.currentIndexChanged.connect(self._on_filter_changed)
 
         self._pid_search = QLineEdit()
         self._pid_search.setPlaceholderText("Search by PID…")
         self._pid_search.setMaximumWidth(180)
-        self._pid_search.textChanged.connect(self.refresh)
+        self._pid_search.textChanged.connect(self._on_filter_changed)
 
         filter_row.addWidget(QLabel("Study:"))
         filter_row.addWidget(self._study_filter)
@@ -90,11 +94,22 @@ class ParticipantTab(QWidget):
         self._table.itemSelectionChanged.connect(
             lambda: self._btn_edit.setEnabled(bool(self._table.selectedItems()))
         )
-
         layout.addWidget(self._table)
 
+        # ── Pagination bar ─────────────────────────────────────────────────
+        self._pagination = PaginationBar()
+        self._pagination.page_changed.connect(self._on_page_changed)
+        layout.addWidget(self._pagination)
+
+    def _on_filter_changed(self):
+        self._page = 1
+        self.refresh()
+
+    def _on_page_changed(self, page: int):
+        self._page = page
+        self.refresh()
+
     def _load_studies(self):
-        """Populate the study filter dropdown."""
         with get_session() as session:
             service = StudyService(session)
             self._studies = [(s.id, s.project_id_short) for s in service.get_all_active()]
@@ -105,7 +120,6 @@ class ParticipantTab(QWidget):
         self._study_filter.addItem("All Studies", None)
         for sid, short_id in self._studies:
             self._study_filter.addItem(short_id, sid)
-        # Restore selection if possible
         idx = self._study_filter.findData(current)
         if idx >= 0:
             self._study_filter.setCurrentIndex(idx)
@@ -124,7 +138,9 @@ class ParticipantTab(QWidget):
 
         with get_session() as session:
             service = ParticipantService(session)
-            participants, total = service.search(filters, page=1, page_size=200)
+            participants, total = service.search(
+                filters, page=self._page, page_size=PAGE_SIZE
+            )
             data = [
                 (
                     p.pid,
@@ -140,18 +156,17 @@ class ParticipantTab(QWidget):
                     ))),
                     p.notes or "",
                     str(p.created_at.date()) if p.created_at else "",
-                    p.id,  # hidden
+                    p.id,
                 )
                 for p in participants
             ]
 
-        # Map study_id → short_id for display
         study_map = {sid: short for sid, short in self._studies}
 
         self._table.setRowCount(len(data))
         for row_idx, row_data in enumerate(data):
             display = list(row_data[:-1])
-            display[1] = study_map.get(row_data[1], str(row_data[1]))  # replace id with short name
+            display[1] = study_map.get(row_data[1], str(row_data[1]))
 
             for col_idx, value in enumerate(display):
                 item = QTableWidgetItem(str(value))
@@ -160,7 +175,11 @@ class ParticipantTab(QWidget):
 
             self._table.item(row_idx, 0).setData(Qt.ItemDataRole.UserRole, row_data[-1])
 
-        self._lbl_count.setText(f"{len(data)} participant{'s' if len(data)!=1 else ''}")
+        self._lbl_count.setText(
+            f"{total} participant{'s' if total != 1 else ''}  "
+            f"(showing {len(data)})"
+        )
+        self._pagination.set_page(self._page, total, PAGE_SIZE)
 
     @slot_safe
     def _on_new(self):
