@@ -50,11 +50,50 @@ class AdminTab(QWidget):
             layout.addWidget(lbl)
             return
 
+        # Backup indicator row
+        backup_row = QHBoxLayout()
+        self._backup_status_lbl = QLabel("Checking backup…")
+        self._backup_status_lbl.setStyleSheet("color: grey; font-size: 11px;")
+        btn_backup = QPushButton("💾  Backup Now")
+        btn_backup.clicked.connect(self._on_backup_now)
+        backup_row.addWidget(self._backup_status_lbl)
+        backup_row.addStretch()
+        backup_row.addWidget(btn_backup)
+        layout.addLayout(backup_row)
+        self._refresh_backup_label()
+
         inner_tabs = QTabWidget()
         inner_tabs.addTab(self._build_users_tab(),        "👥  Users")
         inner_tabs.addTab(self._build_audit_tab(),        "📜  Audit Trail")
         inner_tabs.addTab(self._build_custom_fields_tab(),"⚙️  Custom Fields")
         layout.addWidget(inner_tabs)
+
+    def _refresh_backup_label(self):
+        try:
+            from app.config import BACKUP_DIR
+            backups = sorted(BACKUP_DIR.glob("*.db"), key=lambda p: p.stat().st_mtime)
+            if backups:
+                import datetime
+                ts = datetime.datetime.fromtimestamp(backups[-1].stat().st_mtime)
+                text = f"Last backup: {ts.strftime('%Y-%m-%d %H:%M')}"
+            else:
+                text = "No backup found"
+        except Exception:
+            text = "No backup found"
+        self._backup_status_lbl.setText(text)
+
+    def _on_backup_now(self):
+        from app.utils.backup import run_backup
+        ok, path = run_backup()
+        if ok:
+            self._refresh_backup_label()
+            main = self.window()
+            if hasattr(main, "_refresh_backup_label"):
+                main._refresh_backup_label()
+            QMessageBox.information(self, "Backup complete",
+                                    f"Database backed up to:\n{path}")
+        else:
+            QMessageBox.warning(self, "Backup failed", path)
 
     # ══════════════════════════════════════════════════════════════════════
     # USERS SUB-TAB
@@ -349,6 +388,7 @@ class AdminTab(QWidget):
                     entry.description or "",
                 ))
 
+        self._audit_table.setSortingEnabled(False)
         self._audit_table.setRowCount(len(data))
         action_colors = {
             AuditAction.DELETE:  "#FFCCCC",
@@ -369,6 +409,7 @@ class AdminTab(QWidget):
                 for col_idx in range(6):
                     self._audit_table.item(row_idx, col_idx).setBackground(color)
 
+        self._audit_table.setSortingEnabled(True)
         self._audit_count_lbl.setText(f"{total} entries total")
         self._audit_pagination.set_page(self._audit_page, total, 100)
 

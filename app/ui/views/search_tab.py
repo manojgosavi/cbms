@@ -241,6 +241,7 @@ class SearchTab(QWidget):
                 filters, page=self._page, page_size=PAGE_SIZE
             )
 
+        self._table.setSortingEnabled(False)
         self._table.setRowCount(len(self._results))
 
         for row_idx, r in enumerate(self._results):
@@ -275,6 +276,7 @@ class SearchTab(QWidget):
                 Qt.ItemDataRole.UserRole, r.aliquot_db_id
             )
 
+        self._table.setSortingEnabled(True)
         mode = "OR" if filters.use_or else "AND"
         self._lbl_count.setText(
             f"{total} result(s)  [{mode} mode]"

@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QTabWidget, QWidget, QVBoxLayout,
 )
 
-from app.config import APP_TITLE, APP_VERSION
+from app.config import APP_TITLE, APP_VERSION, BACKUP_DIR
 from app.core.services.auth_service import app_session
 
 
@@ -123,15 +123,32 @@ class MainWindow(QMainWindow):
 
     # ── Status bar ─────────────────────────────────────────────────────────
 
+    def _get_last_backup_str(self) -> str:
+        try:
+            backups = sorted(BACKUP_DIR.glob("*.db"), key=lambda p: p.stat().st_mtime)
+            if backups:
+                import datetime
+                ts = datetime.datetime.fromtimestamp(backups[-1].stat().st_mtime)
+                return f"Last backup: {ts.strftime('%Y-%m-%d %H:%M')}"
+        except Exception:
+            pass
+        return "No backup found"
+
     def _build_status_bar(self):
         bar = QStatusBar()
         user = app_session.current_user
         if user:
             bar.showMessage(
-                f"Logged in as: {user.username}  |  "
-                f"Role: {user.role}  |  {APP_TITLE}"
+                f"Logged in as: {user.username}  |  Role: {user.role}  |  {APP_TITLE}"
             )
+        self._backup_lbl = QLabel()
+        self._backup_lbl.setStyleSheet("color: grey; margin-right: 8px;")
+        bar.addPermanentWidget(self._backup_lbl)
         self.setStatusBar(bar)
+        self._refresh_backup_label()
+
+    def _refresh_backup_label(self):
+        self._backup_lbl.setText(self._get_last_backup_str())
 
     # ── Startup checks ─────────────────────────────────────────────────────
 
@@ -184,6 +201,7 @@ class MainWindow(QMainWindow):
         from app.utils.backup import run_backup
         ok, path = run_backup()
         if ok:
+            self._refresh_backup_label()
             QMessageBox.information(self, "Backup complete",
                                     f"Database backed up to:\n{path}")
         else:
