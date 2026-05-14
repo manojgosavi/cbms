@@ -24,6 +24,9 @@ from app.config import CohortName, Gender, Site, SampleType
 from app.core.models.database import get_session
 from app.core.services.catalogue_service import CatalogueRow, CatalogueService
 from app.core.services.study_service import StudyService
+from app.ui.widgets.pagination_bar import PaginationBar
+
+PAGE_SIZE = 100
 
 
 class ReportsTab(QWidget):
@@ -32,6 +35,7 @@ class ReportsTab(QWidget):
         super().__init__(parent)
         self._rows: List[CatalogueRow] = []
         self._col_headers: List[str]   = []
+        self._report_page = 1
         self._build_ui()
 
     def _build_ui(self):
@@ -147,6 +151,14 @@ class ReportsTab(QWidget):
         )
         layout.addWidget(self._table)
 
+        self._pagination = PaginationBar()
+        self._pagination.page_changed.connect(self._on_page_changed)
+        layout.addWidget(self._pagination)
+
+    def _on_page_changed(self, page: int):
+        self._report_page = page
+        self._render_page()
+
     def _load_studies(self):
         with get_session() as session:
             svc = StudyService(session)
@@ -154,6 +166,7 @@ class ReportsTab(QWidget):
                 self._study_combo.addItem(s.project_id_short, s.id)
 
     def _on_generate(self):
+        self._report_page = 1
         study_id = self._study_combo.currentData()
         avail    = self._available_only.isChecked()
 
@@ -190,17 +203,35 @@ class ReportsTab(QWidget):
             self._summary_lbl.setText("No data found for selected filters.")
             self._table.setRowCount(0)
             self._btn_export.setEnabled(False)
+            self._pagination.set_page(1, 0, PAGE_SIZE)
             return
 
-        # ── Populate pivot table ───────────────────────────────────────────
+        total_aliquots = sum(r.total_aliquots for r in self._rows)
+        filter_note = " [filtered]" if any([pid_q, gender_q, disease_q, cohort_q, site_q, stype_q]) else ""
+        self._summary_lbl.setText(
+            f"{len(self._rows)} participant(s)  |  "
+            f"{len(self._col_headers)} sample type(s)  |  "
+            f"{total_aliquots} total aliquots{filter_note}"
+        )
+        self._btn_export.setEnabled(True)
+        self._render_page()
+
+    def _render_page(self):
+        """Render the current page slice of self._rows into the table."""
+        if not self._rows:
+            return
+        start = (self._report_page - 1) * PAGE_SIZE
+        end   = start + PAGE_SIZE
+        page_rows = self._rows[start:end]
+
         demo_cols = ["PID", "Study", "Age", "Gender", "Disease", "Cohort", "Site", "Total"]
         all_cols  = demo_cols + self._col_headers
 
         self._table.setColumnCount(len(all_cols))
         self._table.setHorizontalHeaderLabels(all_cols)
-        self._table.setRowCount(len(self._rows))
+        self._table.setRowCount(len(page_rows))
 
-        for row_idx, row in enumerate(self._rows):
+        for row_idx, row in enumerate(page_rows):
             demo_vals = [
                 row.pid, row.study_code, row.age, row.gender,
                 row.disease, row.cohort_name, row.site_name, row.total_aliquots,
@@ -219,14 +250,7 @@ class ReportsTab(QWidget):
                     item.setBackground(QColor("#E2EFDA"))
                 self._table.setItem(row_idx, col_idx, item)
 
-        total_aliquots = sum(r.total_aliquots for r in self._rows)
-        filter_note = " [filtered]" if any([pid_q, gender_q, disease_q, cohort_q, site_q, stype_q]) else ""
-        self._summary_lbl.setText(
-            f"{len(self._rows)} participant(s)  |  "
-            f"{len(self._col_headers)} sample type(s)  |  "
-            f"{total_aliquots} total aliquots{filter_note}"
-        )
-        self._btn_export.setEnabled(True)
+        self._pagination.set_page(self._report_page, len(self._rows), PAGE_SIZE)
 
     def _on_clear_filters(self):
         self._f_pid.clear()

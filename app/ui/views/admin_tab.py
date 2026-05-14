@@ -268,7 +268,7 @@ class AdminTab(QWidget):
         self._audit_date_to.setDate(QDate.currentDate())
 
         btn_audit_search = QPushButton("Search")
-        btn_audit_search.clicked.connect(self._load_audit)
+        btn_audit_search.clicked.connect(lambda: self._load_audit(reset_page=True))
 
         fbl.addWidget(QLabel("Action:"))
         fbl.addWidget(self._audit_action_filter)
@@ -302,10 +302,22 @@ class AdminTab(QWidget):
         self._audit_count_lbl.setStyleSheet("color: grey;")
         layout.addWidget(self._audit_count_lbl)
 
+        from app.ui.widgets.pagination_bar import PaginationBar
+        self._audit_pagination = PaginationBar()
+        self._audit_pagination.page_changed.connect(self._on_audit_page_changed)
+        layout.addWidget(self._audit_pagination)
+
+        self._audit_page = 1
         self._load_audit()
         return w
 
-    def _load_audit(self):
+    def _on_audit_page_changed(self, page: int):
+        self._audit_page = page
+        self._load_audit()
+
+    def _load_audit(self, reset_page: bool = False):
+        if reset_page:
+            self._audit_page = 1
         action = self._audit_action_filter.currentData()
         entity = self._audit_entity_filter.text().strip() or None
         date_from = self._audit_date_from.date().toPyDate()
@@ -318,7 +330,8 @@ class AdminTab(QWidget):
                 entity_type=entity,
                 date_from=date_from,
                 date_to=date_to,
-                page_size=500,
+                page=self._audit_page,
+                page_size=100,
             )
             # Load usernames while session is open
             data = []
@@ -356,9 +369,8 @@ class AdminTab(QWidget):
                 for col_idx in range(6):
                     self._audit_table.item(row_idx, col_idx).setBackground(color)
 
-        self._audit_count_lbl.setText(
-            f"Showing {len(data)} of {total} entries"
-        )
+        self._audit_count_lbl.setText(f"{total} entries total")
+        self._audit_pagination.set_page(self._audit_page, total, 100)
 
     # ══════════════════════════════════════════════════════════════════════
     # CUSTOM FIELDS SUB-TAB

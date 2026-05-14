@@ -27,7 +27,10 @@ from PyQt6.QtWidgets import (
 
 from app.core.models.database import get_session
 from app.core.services.search_service import SearchFilters, SearchResult, SearchService
+from app.ui.widgets.pagination_bar import PaginationBar
 from app.utils.exception_handler import slot_safe
+
+PAGE_SIZE = 100
 
 
 class SearchTab(QWidget):
@@ -44,6 +47,7 @@ class SearchTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._results: List[SearchResult] = []
+        self._page = 1
         self._build_ui()
 
     def _build_ui(self):
@@ -178,6 +182,10 @@ class SearchTab(QWidget):
 
         right_layout.addWidget(self._table)
 
+        self._pagination = PaginationBar()
+        self._pagination.page_changed.connect(self._on_page_changed)
+        right_layout.addWidget(self._pagination)
+
         splitter.addWidget(left)
         splitter.addWidget(right)
         splitter.setStretchFactor(0, 0)
@@ -217,13 +225,21 @@ class SearchTab(QWidget):
 
     # ── Search ─────────────────────────────────────────────────────────────
 
+    def _on_page_changed(self, page: int):
+        self._page = page
+        self._on_search(reset_page=False)
+
     @slot_safe
-    def _on_search(self):
+    def _on_search(self, reset_page: bool = True):
+        if reset_page:
+            self._page = 1
         filters = self._build_filters()
 
         with get_session() as session:
             svc = SearchService(session)
-            self._results, total = svc.search(filters)
+            self._results, total = svc.search(
+                filters, page=self._page, page_size=PAGE_SIZE
+            )
 
         self._table.setRowCount(len(self._results))
 
@@ -261,9 +277,10 @@ class SearchTab(QWidget):
 
         mode = "OR" if filters.use_or else "AND"
         self._lbl_count.setText(
-            f"{len(self._results)} result(s) of {total} total  [{mode} mode]"
+            f"{total} result(s)  [{mode} mode]"
         )
         self._btn_export.setEnabled(len(self._results) > 0)
+        self._pagination.set_page(self._page, total, PAGE_SIZE)
 
     @slot_safe
     def _on_clear(self):
