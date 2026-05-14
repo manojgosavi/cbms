@@ -7,24 +7,25 @@ REM   1. Checks Python 3.10+ is available
 REM   2. Creates a virtual environment (venv\) if not already present
 REM   3. Installs all dependencies from requirements.txt
 REM   4. Installs PyInstaller
-REM   5. Builds the CBMS.exe bundle via build.py
+REM   5. Builds CBMS.exe (single-file, default) via build.py
 REM
 REM Usage:
-REM   install_and_build.bat           (normal build — folder mode)
-REM   install_and_build.bat --onefile (single .exe file)
+REM   install_and_build.bat           (default — single CBMS.exe)
+REM   install_and_build.bat --onedir  (folder mode — faster startup)
 REM
 REM Output:
-REM   dist\CBMS\        (folder mode — default, faster startup)
-REM   dist\CBMS.exe     (onefile mode)
+REM   dist\CBMS.exe     (default — single file, easy to distribute)
+REM   dist\CBMS\        (--onedir mode — faster startup)
 REM =============================================================================
 
 setlocal EnableDelayedExpansion
 
-set ONEFILE_FLAG=
+REM Default: onefile (single CBMS.exe)
+set BUILD_FLAG=--onefile
 
 REM ── Parse args ────────────────────────────────────────────────────────────────
 for %%A in (%*) do (
-    if "%%A"=="--onefile" set ONEFILE_FLAG=--onefile
+    if "%%A"=="--onedir" set BUILD_FLAG=--onedir
 )
 
 echo.
@@ -110,7 +111,7 @@ echo.
 echo ^> Building CBMS app...
 echo.
 
-python build.py %ONEFILE_FLAG%
+python build.py %BUILD_FLAG%
 if errorlevel 1 (
     echo.
     echo   X Build failed. See output above.
@@ -124,10 +125,10 @@ echo +----------------------------------------------+
 echo ^|   Build complete!                            ^|
 echo +----------------------------------------------+
 echo.
-if "%ONEFILE_FLAG%"=="--onefile" (
-    echo   Executable: dist\CBMS.exe
-) else (
+if "%BUILD_FLAG%"=="--onedir" (
     echo   App folder: dist\CBMS\
+) else (
+    echo   Executable: dist\CBMS.exe
 )
 echo.
 echo   To run directly without building:

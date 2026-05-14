@@ -1,17 +1,8 @@
 # CBMS macOS Build Instructions
 
-## Quick Start (If Build Fails)
+## Quick Start
 
-### Step 1: Clean Up Old Database
-The database schema has changed. Delete the old one:
-
-```bash
-rm -f data/cbms.db
-rm -f data/cbms.db-shm
-rm -f data/cbms.db-wal
-```
-
-### Step 2: Run the Installer
+### Step 1: Run the Installer & Build
 
 ```bash
 chmod +x install_and_build.sh
@@ -21,104 +12,82 @@ chmod +x install_and_build.sh
 This will:
 1. ✅ Create a Python virtual environment
 2. ✅ Install all dependencies
-3. ✅ Build the macOS app bundle
-4. ✅ Create a fresh database with new schema
+3. ✅ Build `dist/CBMS.app`
+4. ✅ Create `dist/CBMS-v1.0.0.dmg` (drag-and-drop installer)
 
-### Step 3: Run the App
+### Step 2: Distribute via DMG
 
-The app will be in `dist/CBMS.app`:
+Open the DMG and drag **CBMS** to the **Applications** folder:
 
-**Option A: From Finder**
-- Navigate to `dist/CBMS.app`
-- Right-click → Open
-- Click "Open" when macOS warns about unsigned app
-
-**Option B: From Terminal**
 ```bash
-open dist/CBMS.app
+open dist/CBMS-v1.0.0.dmg
+```
+
+### Step 3: First Launch (Gatekeeper)
+
+Because the app is unsigned, macOS will block it the first time:
+
+**Option A — Right-click method:**
+- In Finder, right-click `CBMS.app` → **Open** → click **Open**
+
+**Option B — Terminal (once only):**
+```bash
+xattr -d com.apple.quarantine /Applications/CBMS.app
+open /Applications/CBMS.app
+```
+
+---
+
+## Running Without Building
+
+For development or quick testing, skip the build entirely:
+
+```bash
+source venv/bin/activate
+python main.py
 ```
 
 ---
 
 ## Troubleshooting
 
-### "Can't open CBMS.app" 
-This is because the app is unsigned. Do this once:
-```bash
-# Allow the app to run (requires once-only permission grant)
-xattr -d com.apple.quarantine dist/CBMS.app
-open dist/CBMS.app
-```
-
 ### "ModuleNotFoundError: No module named 'sqlalchemy'"
-The venv didn't activate correctly. Try:
+The venv didn't activate. Run:
 ```bash
 source venv/bin/activate
-python -m pip install -r requirements.txt --upgrade
+pip install -r requirements.txt --upgrade
 python build.py
 ```
 
-### "Table 'participants' already exists"
-The old database schema conflicts with the new one. Delete it:
-```bash
-rm -f data/cbms.db*
-./install_and_build.sh
-```
+### "Can't create DMG" / hdiutil error
+The DMG step requires `dist/CBMS.app` to exist. Make sure the PyInstaller step completed successfully first (check for errors in the build output).
 
-### Port 5432 / Database Locked
-If the app crashes with database errors, close any other instances:
+### Database issues on first run
+If the app crashes with a database error, delete the old database and let it recreate:
 ```bash
-# Check for running Python processes
-ps aux | grep python
-
-# Kill any hanging processes
-pkill -f "cbms"
+rm -f data/cbms.db data/cbms.db-shm data/cbms.db-wal
+open dist/CBMS.app
 ```
 
 ---
 
-## Advanced: Manual Build Steps
+## Manual Build Steps
 
-If the script fails, do this step-by-step:
+If the script fails, run each step individually:
 
 ```bash
-# 1. Create and activate virtual environment
 python3 -m venv venv
 source venv/bin/activate
-
-# 2. Install dependencies
 pip install --upgrade pip
 pip install -r requirements.txt
-
-# 3. Delete old database (schema changed)
-rm -f data/cbms.db*
-
-# 4. Build the app
-python build.py
-
-# 5. Run it
-open dist/CBMS.app
+python build.py           # builds CBMS.app + DMG
 ```
-
----
-
-## What Changed
-
-⚠️ **Database schema has been updated** with:
-- New enum fields (Gender, Population, Disease, Site, Visit Name, Sample Type, Cohort)
-- User-provided PIDs (instead of auto-generated)
-- 6-level storage hierarchy (Freezer → Compartment → Rack → Drawer → Box → Position)
-- New columns for Excel bulk upload
-
-**Old database is incompatible.** Always delete `data/cbms.db` before running the new version.
 
 ---
 
 ## Need More Help?
 
-Check:
 1. Python version: `python3 --version` (need 3.10+)
 2. Virtual env active: `which python` should show `.../venv/bin/python`
 3. Dependencies installed: `pip list | grep PyQt6`
-4. Build log: Check terminal output for specific error messages
-
+4. Build log: check terminal output for the specific error line
