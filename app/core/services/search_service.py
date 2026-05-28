@@ -80,18 +80,20 @@ class SearchFilters:
 @dataclass
 class SearchResult:
     # Participant
-    pid:      str
-    age:      Optional[int]
-    gender:   Optional[str]
-    disease:  Optional[str]
-    cohort:   Optional[str]
-    site_name: Optional[str]
+    pid:        str
+    age:        Optional[int]
+    gender:     Optional[str]
+    disease:    Optional[str]
+    cohort:     Optional[str]
+    population: Optional[str]
+    site_name:  Optional[str]
     visit_time: Optional[str]
 
     # Sample
     sample_id:       str
     sample_type:     str
     collection_date: Optional[dt.date]
+    visit_code:      Optional[str]
     visit_name:      Optional[str]
 
     # Aliquot
@@ -233,11 +235,13 @@ class SearchService:
                 gender=participant.gender,
                 disease=participant.disease,
                 cohort=participant.cohort_name,
+                population=participant.population,
                 site_name=participant.site_name,
                 visit_time=sample.visit_time,
                 sample_id=sample.sample_id,
                 sample_type=sample.sample_type,
                 collection_date=sample.collection_date,
+                visit_code=sample.visit_code,
                 visit_name=None,
                 aliquot_id=aliquot.aliquot_id,
                 aliquot_db_id=aliquot.id,

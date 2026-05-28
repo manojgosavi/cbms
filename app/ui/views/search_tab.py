@@ -37,9 +37,9 @@ class SearchTab(QWidget):
 
     # Columns shown in results table
     COLUMNS = [
-        "PID", "Age", "Gender", "Disease", "Cohort", "Site",
-        "Sample ID", "Sample Type", "Collection Date",
-        "Aliquot ID", "Vol (µL)", "Status",
+        "PID", "Age", "Gender", "Disease", "Cohort", "Population", "Site",
+        "Sample ID", "Sample Type", "Collection Date", "Visit Code",
+        "Aliquot ID", "Status",
         "Freezer", "Compartment", "Rack", "Drawer", "Box", "Position",
         "Discrepancy",
     ]
@@ -178,7 +178,7 @@ class SearchTab(QWidget):
 
         header = self._table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(18, QHeaderView.ResizeMode.Stretch)  # Discrepancy
+        header.setSectionResizeMode(19, QHeaderView.ResizeMode.Stretch)  # Discrepancy
 
         right_layout.addWidget(self._table)
 
@@ -260,10 +260,10 @@ class SearchTab(QWidget):
                 pos_label = f"{r.position_row + 1}{col_label}"
 
             values = [
-                r.pid, r.age, r.gender, r.disease, r.cohort, r.site_name,
+                r.pid, r.age, r.gender, r.disease, r.cohort, r.population, r.site_name,
                 r.sample_id, r.sample_type,
-                str(r.collection_date) if r.collection_date else "",
-                r.aliquot_id, r.volume_ul, status,
+                str(r.collection_date) if r.collection_date else "", r.visit_code,
+                r.aliquot_id, status,
                 r.freezer_name, r.compartment_name, r.rack_name,
                 r.drawer_name, r.box_name, pos_label,
                 "⚠" if r.discrepancy_remark else "",
