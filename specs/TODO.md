@@ -39,3 +39,4 @@
 - ~~Any other improvement that is currently missing and should be implemented.~~ ✓ done (export from participant tab, sortable columns, last backup indicator)
 - ~~Any improvement on building & installing the app.~~ ✓ done (macOS DMG via hdiutil, Windows onefile EXE default, version bumped to 1.0.0)
 - ~~In Samples tab, ID shown should be the PID selected from left pan. Can you remove the sample ID auto generated & replace it with PID.Also add the visit code column in right pane. Bottom left pan showing data visit code wise should also show PIDs & not auto generated sample IDs.~~ ✓ done
+- ~~In search tab, results in right pane should include visit code & population column, remove the Vol column.~~ ✓ done
