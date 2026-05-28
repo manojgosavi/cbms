@@ -38,4 +38,4 @@
 - ~~Add pagination whereever necessary.~~ ✓ done
 - ~~Any other improvement that is currently missing and should be implemented.~~ ✓ done (export from participant tab, sortable columns, last backup indicator)
 - ~~Any improvement on building & installing the app.~~ ✓ done (macOS DMG via hdiutil, Windows onefile EXE default, version bumped to 1.0.0)
-- Add logout / switch-user functionality (revisit when ready).
+- ~~In Samples tab, ID shown should be the PID selected from left pan. Can you remove the sample ID auto generated & replace it with PID.Also add the visit code column in right pane. Bottom left pan showing data visit code wise should also show PIDs & not auto generated sample IDs.~~ ✓ done
