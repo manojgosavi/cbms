@@ -130,9 +130,9 @@ class SampleTab(QWidget):
         right_layout.addLayout(btn_row)
 
         self._sample_tree = QTreeWidget()
-        self._sample_tree.setColumnCount(6)
+        self._sample_tree.setColumnCount(7)
         self._sample_tree.setHeaderLabels(
-            ["ID", "Type", "Collection Date", "Vol (µL)", "Status", "Discrepancy"]
+            ["ID", "Visit Code", "Type", "Collection Date", "Vol (µL)", "Status", "Discrepancy"]
         )
         self._sample_tree.setAlternatingRowColors(True)
         self._sample_tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -140,7 +140,8 @@ class SampleTab(QWidget):
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)
         self._sample_tree.itemSelectionChanged.connect(self._on_tree_selection_changed)
         right_layout.addWidget(self._sample_tree)
 
@@ -293,7 +294,7 @@ class SampleTab(QWidget):
                             a.id,
                         ))
 
-                    visits[visit_key].append(s.sample_id)
+                    visits[visit_key].append(s.participant.pid)
                     all_sample_data.append((
                         s.sample_id,
                         s.sample_type,
@@ -304,6 +305,7 @@ class SampleTab(QWidget):
                         s.id,
                         aliquot_data,
                         visit_key,
+                        s.participant.pid,
                     ))
 
         self._all_sample_data = all_sample_data
@@ -318,9 +320,9 @@ class SampleTab(QWidget):
             visit_item = QTreeWidgetItem(self._visit_list)
             visit_item.setText(0, visit_key)
             visit_item.setData(0, Qt.ItemDataRole.UserRole, visit_key)
-            for sample_id in self._visits_dict[visit_key]:
+            for pid in self._visits_dict[visit_key]:
                 child = QTreeWidgetItem(visit_item)
-                child.setText(0, f"  {sample_id}")
+                child.setText(0, f"  {pid}")
 
         self._visit_list.expandAll()
         self._render_sample_tree(self._all_sample_data)
@@ -330,20 +332,21 @@ class SampleTab(QWidget):
     def _render_sample_tree(self, sample_data: list):
         self._sample_tree.clear()
 
-        for s_id, s_type, s_date, _, s_count, _, db_id, aliquots, visit_key in sample_data:
+        for s_id, s_type, s_date, _, s_count, _, db_id, aliquots, visit_key, pid in sample_data:
             sample_item = QTreeWidgetItem(self._sample_tree)
-            sample_item.setText(0, s_id)
-            sample_item.setText(1, s_type)
-            sample_item.setText(2, s_date)
-            sample_item.setText(4, s_count)
+            sample_item.setText(0, pid)
+            sample_item.setText(1, visit_key if visit_key != "No Visit" else "")
+            sample_item.setText(2, s_type)
+            sample_item.setText(3, s_date)
+            sample_item.setText(5, s_count)
             sample_item.setData(0, Qt.ItemDataRole.UserRole, ("sample", db_id))
 
             for a_id, _, _, a_vol, a_status, a_disc, a_db_id in aliquots:
                 aliquot_item = QTreeWidgetItem(sample_item)
                 aliquot_item.setText(0, f"  ↳ {a_id}")
-                aliquot_item.setText(3, a_vol)
-                aliquot_item.setText(4, a_status)
-                aliquot_item.setText(5, "⚠" if a_disc else "")
+                aliquot_item.setText(4, a_vol)
+                aliquot_item.setText(5, a_status)
+                aliquot_item.setText(6, "⚠" if a_disc else "")
                 aliquot_item.setData(0, Qt.ItemDataRole.UserRole, ("aliquot", a_db_id))
                 color_map = {
                     "Shipped":   QColor("#CCE5FF"),
@@ -351,7 +354,7 @@ class SampleTab(QWidget):
                     "Available": QColor("#D4EDDA"),
                 }
                 if a_status in color_map:
-                    for col in range(6):
+                    for col in range(7):
                         aliquot_item.setBackground(col, color_map[a_status])
 
         self._sample_tree.expandAll()
