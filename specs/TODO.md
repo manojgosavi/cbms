@@ -40,3 +40,4 @@
 - ~~Any improvement on building & installing the app.~~ ✓ done (macOS DMG via hdiutil, Windows onefile EXE default, version bumped to 1.0.0)
 - ~~In Samples tab, ID shown should be the PID selected from left pan. Can you remove the sample ID auto generated & replace it with PID.Also add the visit code column in right pane. Bottom left pan showing data visit code wise should also show PIDs & not auto generated sample IDs.~~ ✓ done
 - ~~In search tab, results in right pane should include visit code & population column, remove the Vol column.~~ ✓ done
+- ~~The Ecxel Import for large file about Million records is taking lot of time. Can we improve performance & optimized it?~~ ✓ done

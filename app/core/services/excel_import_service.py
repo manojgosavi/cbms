@@ -16,10 +16,11 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 from pathlib import Path
 import re
-from typing import Optional
+from typing import Callable, Optional
 from dateutil.parser import parse, ParserError
 import openpyxl
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import Gender, Population, Disease, Site, VisitName, SampleType, CohortName
@@ -27,7 +28,7 @@ from app.core.models.models import (
     Participant, Sample, SampleAliquot, Study, Freezer, Compartment,
     StorageRack, StorageDrawer, StorageBox, BoxPosition, AliquotLocation
 )
-from app.core.services.id_generator import generate_sample_id, generate_aliquot_id
+from app.core.services.id_generator import generate_aliquot_id
 from app.core.repositories.storage_repository import FreezerRepository
 
 # Valid hierarchy values for upright freezers (Freezer 1 & 2)
@@ -40,8 +41,10 @@ VALID_CYLINDRICAL_RACKS           = [f"{i:02d}" for i in range(1, 14)]
 CYLINDRICAL_SENTINEL_COMPARTMENT  = "CYLINDRICAL"
 CYLINDRICAL_SENTINEL_DRAWER       = "01"
 
+# Rows processed per flush+commit cycle during bulk import
+IMPORT_BATCH_SIZE = 500
+
 # Import-time aliases: maps lowercase raw value → canonical enum value.
-# Used when the source data uses abbreviations or alternate spellings.
 _SITE_ALIASES: dict[str, str] = {
     "nari":      "ICMR-NARI",
     "icmr-nari": "ICMR-NARI",
@@ -122,6 +125,8 @@ class ExcelImportService:
         """
         Load Excel file, parse rows, and validate each row.
 
+        Uses read_only=True for streaming to avoid loading the full file into RAM.
+
         Returns:
           (validated_rows, header_errors)
 
@@ -133,59 +138,68 @@ class ExcelImportService:
             return [], [f"File not found: {filepath}"]
 
         try:
-            wb = openpyxl.load_workbook(filepath, data_only=True)
+            wb = openpyxl.load_workbook(filepath, data_only=True, read_only=True)
             ws = wb.active
         except Exception as e:
             return [], [f"Failed to open Excel file: {e}"]
 
-        # Validate headers
-        actual_headers = [cell for cell in ws[1]]
-        actual_headers = [h.value if h else None for h in actual_headers[:21]]
+        try:
+            # Validate headers by reading only the first row
+            first_row_iter = ws.iter_rows(min_row=1, max_row=1, values_only=True)
+            first_row = next(first_row_iter, ())
+            actual_headers = [first_row[i] if i < len(first_row) else None for i in range(21)]
 
-        mismatches = []
-        for i, (exp, got) in enumerate(zip(self.EXPECTED_HEADERS, actual_headers)):
-            e_norm = str(exp or '').lower().strip()
-            g_norm = str(got or '').lower().strip()
-            if e_norm != g_norm:
-                ratio = SequenceMatcher(None, e_norm, g_norm).ratio()
-                if ratio < 0.80:
-                    mismatches.append(f"Column {i+1}: expected '{exp}', got '{got}'")
-        if mismatches:
-            return [], [
-                "Excel header mismatch:\n" + "\n".join(mismatches)
-            ]
+            mismatches = []
+            for i, (exp, got) in enumerate(zip(self.EXPECTED_HEADERS, actual_headers)):
+                e_norm = str(exp or '').lower().strip()
+                g_norm = str(got or '').lower().strip()
+                if e_norm != g_norm:
+                    ratio = SequenceMatcher(None, e_norm, g_norm).ratio()
+                    if ratio < 0.80:
+                        mismatches.append(f"Column {i+1}: expected '{exp}', got '{got}'")
+            if mismatches:
+                return [], [
+                    "Excel header mismatch:\n" + "\n".join(mismatches)
+                ]
 
-        # Parse rows
-        rows = []
-        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-            # Ensure row has at least 21 columns
-            row_data = list(row[:21]) + [None] * (21 - len(row[:21]))
+            # Stream rows from row 2 onward
+            rows = []
+            for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                # Ensure row has at least 21 columns
+                row_data = list(row[:21]) + [None] * (21 - len(row[:21]))
 
-            import_row = ImportRow(
-                row_num=row_idx,
-                pid=row_data[0],
-                age=row_data[1],
-                gender=row_data[2],
-                population=row_data[3],
-                disease=row_data[4],
-                visit_code=row_data[5],
-                visit_time=row_data[6],
-                date_collected=row_data[7],
-                site_name=row_data[8],
-                visit_name=row_data[9],
-                sample_type=row_data[10],
-                cohort_name=row_data[11],
-                aliquot_id=row_data[12],
-                freezer_name=_clean_dot(row_data[13]),
-                container_name=_clean_dot(row_data[14]),
-                slot_position=row_data[15],
-                shelf_name=_clean_dot(row_data[16]),
-                rack_drawer_combined=_clean_dot(row_data[17]),
-                position=_clean_dot(row_data[18]),  # Will be populated during validation
-                discrepancy_remark=_clean_dot(row_data[19]),
-                discrepancy_for=_clean_dot(row_data[20]),
-            )
-            rows.append(import_row)
+                # Skip completely empty rows
+                if all(v is None or str(v).strip() == '' for v in row_data):
+                    continue
+
+                import_row = ImportRow(
+                    row_num=row_idx,
+                    pid=row_data[0],
+                    age=row_data[1],
+                    gender=row_data[2],
+                    population=row_data[3],
+                    disease=row_data[4],
+                    visit_code=row_data[5],
+                    visit_time=row_data[6],
+                    date_collected=row_data[7],
+                    site_name=row_data[8],
+                    visit_name=row_data[9],
+                    sample_type=row_data[10],
+                    cohort_name=row_data[11],
+                    aliquot_id=row_data[12],
+                    freezer_name=_clean_dot(row_data[13]),
+                    container_name=_clean_dot(row_data[14]),
+                    slot_position=row_data[15],
+                    shelf_name=_clean_dot(row_data[16]),
+                    rack_drawer_combined=_clean_dot(row_data[17]),
+                    position=_clean_dot(row_data[18]),
+                    discrepancy_remark=_clean_dot(row_data[19]),
+                    discrepancy_for=_clean_dot(row_data[20]),
+                )
+                rows.append(import_row)
+
+        finally:
+            wb.close()
 
         # Validate each row
         for row in rows:
@@ -297,7 +311,6 @@ class ExcelImportService:
                            row.rack_drawer_combined, row.slot_position])
 
         if has_storage:
-            # Core fields required for both upright and cylindrical paths
             missing = []
             if not row.freezer_name:        missing.append("Freezer / Tank")
             if not row.container_name:      missing.append("Container")
@@ -306,10 +319,9 @@ class ExcelImportService:
             if missing:
                 errors.append(f"Storage incomplete. Missing: {', '.join(missing)}")
             else:
-                is_cylindrical = not row.shelf_name  # no shelf → cylindrical freezer
+                is_cylindrical = not row.shelf_name
 
                 if is_cylindrical:
-                    # Cylindrical path: rack is a plain number 01-13 (may arrive as float e.g. 1.0)
                     rack_str = str(row.rack_drawer_combined).strip()
                     try:
                         rack_str = f"{int(float(rack_str)):02d}"
@@ -324,7 +336,6 @@ class ExcelImportService:
                             f"Cylindrical rack must be a number 1–13, got '{rack_str}'"
                         )
                 else:
-                    # Upright path: validate shelf and rack-drawer format
                     row.shelf_name = str(row.shelf_name).strip()
                     if row.shelf_name not in VALID_SHELVES:
                         errors.append(
@@ -350,7 +361,6 @@ class ExcelImportService:
                             )
                         row.rack_drawer_combined = f"{rack_name}-{drawer_name}"
 
-                # Slot position validation applies to both paths
                 try:
                     slot_pos = int(row.slot_position)
                     if slot_pos < 1 or slot_pos > 100:
@@ -381,7 +391,6 @@ class ExcelImportService:
                 date_str = str(date_str).strip()
         try:
             parse(date_str, dayfirst=True)
-            #datetime.strptime(date_str, "%d-%b-%y")
             return True
         except (ParserError, ValueError, TypeError):
             return False
@@ -409,63 +418,43 @@ class ExcelImportService:
         col_idx = zero_indexed % 10     # 0-9
         col_letter = chr(65 + col_idx)  # A-J
         return f"{col_letter}{row}"
-    
+
     def _position_to_row_col(self, position: str) -> tuple[Optional[int], Optional[int]]:
         """
         Convert position string (e.g., "A1", "B5", "J10") to (row, col) indices.
-        
-        Position format: LetterNumber (A-J for columns, 1-10 for rows)
+
         Returns: (0-based row, 0-based col) or (None, None) if invalid
-        
-        Examples:
-          "A1" → (0, 0)
-          "B5" → (4, 1)
-          "J10" → (9, 9)
         """
         if not position or len(position) < 2:
             return None, None
-        
+
         try:
             col_letter = position[0].upper()
             row_num = int(position[1:])
-            
-            # Convert to 0-based indices
             col = ord(col_letter) - ord('A')
             row = row_num - 1
-            
-            # Validate bounds (10×10 grid: rows 0-9, cols A-J which is 0-9)
             if row < 0 or row >= 10 or col < 0 or col >= 10:
                 return None, None
-            
             return row, col
         except (ValueError, AttributeError):
             return None, None
+
+    # ── Storage hierarchy helpers (original, used by non-bulk paths) ─────────
 
     def _get_or_create_storage_hierarchy(
         self, freezer_name: str, container_name: str,
         shelf_name: str, rack_drawer_combined: str
     ) -> tuple[Freezer, Compartment, StorageRack, StorageDrawer, StorageBox]:
-        """
-        Upright freezer hierarchy (Freezer 1 & 2).
-
-        Correct column → DB level mapping:
-          shelf_name (col Q)       → Compartment  (I / II / III / IV)
-          rack_letter from col R   → StorageRack   (A / B / C / D / E / F)
-          drawer_number from col R → StorageDrawer (01 / 02 / 03 / 04 / 05)
-          container_name (col O)   → StorageBox    (actual box name)
-        """
+        """Upright freezer hierarchy (Freezer 1 & 2)."""
         freezer_repo = FreezerRepository(self.session)
         rack_letter, drawer_number = rack_drawer_combined.split('-')
 
-        # Freezer
         freezer = freezer_repo.get_by_name(freezer_name)
         if not freezer:
             freezer = Freezer(name=freezer_name)
             self.session.add(freezer)
             self.session.flush()
 
-        # Compartment = Shelf (I / II / III / IV)
-        # Direct query avoids stale ORM collection cache when same shelf appears in multiple rows
         compartment = self.session.query(Compartment).filter(
             Compartment.name == shelf_name,
             Compartment.freezer_id == freezer.id,
@@ -478,7 +467,6 @@ class ExcelImportService:
                 self.session.add(StorageRack(name=rack_val, compartment_id=compartment.id))
             self.session.flush()
 
-        # StorageRack = Rack letter (A / B / C / D / E / F)
         rack = self.session.query(StorageRack).filter(
             StorageRack.name == rack_letter,
             StorageRack.compartment_id == compartment.id,
@@ -491,7 +479,6 @@ class ExcelImportService:
                 self.session.add(StorageDrawer(name=drawer_val, rack_id=rack.id))
             self.session.flush()
 
-        # StorageDrawer = Drawer number (01 / 02 / 03 / 04 / 05)
         drawer = self.session.query(StorageDrawer).filter(
             StorageDrawer.name == drawer_number,
             StorageDrawer.rack_id == rack.id,
@@ -501,8 +488,6 @@ class ExcelImportService:
             self.session.add(drawer)
             self.session.flush()
 
-        # StorageBox = container_name (actual box label from Excel col O)
-        # Use direct query to avoid stale ORM collection cache on repeated calls
         box = self.session.query(StorageBox).filter(
             StorageBox.name == container_name,
             StorageBox.drawer_id == drawer.id,
@@ -521,18 +506,7 @@ class ExcelImportService:
     def _get_or_create_storage_hierarchy_cylindrical(
         self, freezer_name: str, container_name: str, rack_number: str
     ) -> tuple[Freezer, Compartment, StorageRack, StorageDrawer, StorageBox]:
-        """
-        Cylindrical freezer hierarchy (Freezer 3 & 4).
-
-        No shelf or drawer in the physical structure.
-        Uses sentinel Compartment("CYLINDRICAL") and Drawer("01") to satisfy
-        the fixed-depth DB model.
-
-          CYLINDRICAL_SENTINEL_COMPARTMENT → Compartment
-          rack_number (01-13)              → StorageRack
-          CYLINDRICAL_SENTINEL_DRAWER      → StorageDrawer
-          container_name (col O)           → StorageBox
-        """
+        """Cylindrical freezer hierarchy (Freezer 3 & 4)."""
         freezer_repo = FreezerRepository(self.session)
 
         freezer = freezer_repo.get_by_name(freezer_name)
@@ -587,16 +561,171 @@ class ExcelImportService:
 
         return freezer, compartment, rack, drawer, box
 
-    def import_rows(self, rows: list[ImportRow], study_id: int) -> tuple[int, Optional[str]]:
+    # ── Optimised bulk-import storage cache ──────────────────────────────────
+
+    def _get_box_cached(
+        self,
+        row: ImportRow,
+        freezer_cache: dict,
+        compartment_cache: dict,
+        rack_cache: dict,
+        drawer_cache: dict,
+        box_cache: dict,
+        position_cache: dict,
+    ) -> Optional[tuple[StorageBox, str, str, str]]:
+        """
+        Get or create the StorageBox for a row, using in-memory caches to avoid
+        repeated DB queries for the same hierarchy nodes.
+
+        Returns (box, compartment_name, rack_name, drawer_name) or None on error.
+        """
+        is_cylindrical = not row.shelf_name
+
+        # ── Freezer ──────────────────────────────────────────────────────────
+        freezer = freezer_cache.get(row.freezer_name)
+        if not freezer:
+            freezer = (
+                self.session.query(Freezer)
+                .filter(Freezer.name == row.freezer_name)
+                .first()
+            )
+            if not freezer:
+                freezer = Freezer(name=row.freezer_name)
+                self.session.add(freezer)
+                self.session.flush()
+            freezer_cache[row.freezer_name] = freezer
+
+        # ── Compartment (shelf for upright, sentinel for cylindrical) ─────────
+        if is_cylindrical:
+            compartment_key_name = CYLINDRICAL_SENTINEL_COMPARTMENT
+            rack_key_name        = row.rack_drawer_combined
+            drawer_key_name      = CYLINDRICAL_SENTINEL_DRAWER
+        else:
+            compartment_key_name = row.shelf_name
+            parts = row.rack_drawer_combined.split('-')
+            rack_key_name   = parts[0]
+            drawer_key_name = parts[1]
+
+        comp_key = (freezer.id, compartment_key_name)
+        compartment = compartment_cache.get(comp_key)
+        if not compartment:
+            compartment = (
+                self.session.query(Compartment)
+                .filter(
+                    Compartment.name == compartment_key_name,
+                    Compartment.freezer_id == freezer.id,
+                )
+                .first()
+            )
+            if not compartment:
+                compartment = Compartment(name=compartment_key_name, freezer_id=freezer.id)
+                self.session.add(compartment)
+                self.session.flush()
+                if not is_cylindrical:
+                    for rv in VALID_RACKS:
+                        self.session.add(StorageRack(name=rv, compartment_id=compartment.id))
+                    self.session.flush()
+            compartment_cache[comp_key] = compartment
+
+        # ── Rack ──────────────────────────────────────────────────────────────
+        rack_key = (compartment.id, rack_key_name)
+        rack = rack_cache.get(rack_key)
+        if not rack:
+            rack = (
+                self.session.query(StorageRack)
+                .filter(
+                    StorageRack.name == rack_key_name,
+                    StorageRack.compartment_id == compartment.id,
+                )
+                .first()
+            )
+            if not rack:
+                rack = StorageRack(name=rack_key_name, compartment_id=compartment.id)
+                self.session.add(rack)
+                self.session.flush()
+                if not is_cylindrical:
+                    for dv in VALID_DRAWERS:
+                        self.session.add(StorageDrawer(name=dv, rack_id=rack.id))
+                    self.session.flush()
+            rack_cache[rack_key] = rack
+
+        # ── Drawer ────────────────────────────────────────────────────────────
+        drawer_key = (rack.id, drawer_key_name)
+        drawer = drawer_cache.get(drawer_key)
+        if not drawer:
+            drawer = (
+                self.session.query(StorageDrawer)
+                .filter(
+                    StorageDrawer.name == drawer_key_name,
+                    StorageDrawer.rack_id == rack.id,
+                )
+                .first()
+            )
+            if not drawer:
+                drawer = StorageDrawer(name=drawer_key_name, rack_id=rack.id)
+                self.session.add(drawer)
+                self.session.flush()
+            drawer_cache[drawer_key] = drawer
+
+        # ── Box ───────────────────────────────────────────────────────────────
+        box_key = (drawer.id, row.container_name)
+        box = box_cache.get(box_key)
+        if not box:
+            box = (
+                self.session.query(StorageBox)
+                .filter(
+                    StorageBox.name == row.container_name,
+                    StorageBox.drawer_id == drawer.id,
+                )
+                .first()
+            )
+            if not box:
+                box = StorageBox(name=row.container_name, drawer_id=drawer.id, rows=10, cols=10)
+                self.session.add(box)
+                self.session.flush()
+                # Bulk-create all 100 positions in one shot
+                self.session.bulk_save_objects([
+                    BoxPosition(box_id=box.id, row=r, col=c)
+                    for r in range(10) for c in range(10)
+                ])
+                self.session.flush()
+
+            box_cache[box_key] = box
+
+            # Populate position cache for this box (one query, 100 results)
+            for pos in self.session.query(BoxPosition).filter(BoxPosition.box_id == box.id).all():
+                position_cache[(box.id, pos.row, pos.col)] = pos.id
+
+        return box, compartment_key_name, rack_key_name, drawer_key_name
+
+    # ── Public import entry point ────────────────────────────────────────────
+
+    def import_rows(
+        self,
+        rows: list[ImportRow],
+        study_id: int,
+        progress_callback: Optional[Callable[[int, int], None]] = None,
+    ) -> tuple[int, Optional[str]]:
         """
         Import validated rows into the database.
 
-        Returns:
-          (count_created, error_message)
+        Optimisations vs. the naïve approach:
+          - Pre-computes the starting sample serial with a single MAX() query.
+          - Caches existing participants in memory to avoid per-row SELECT.
+          - Caches storage hierarchy nodes to avoid repeated DB round-trips.
+          - Uses ORM relationships (not raw integer FKs) so SQLAlchemy can batch
+            INSERT ordering within each flush call.
+          - Flushes and commits once per IMPORT_BATCH_SIZE rows instead of 3×
+            per row.
 
-        If error_message is not None, import was rolled back.
+        Args:
+            rows:              Pre-validated ImportRow list (no rows with errors).
+            study_id:          Target study primary key.
+            progress_callback: Optional (processed, total) → None callback.
+
+        Returns:
+            (count_created, error_message)
         """
-        # Check for validation errors
         rows_with_errors = [r for r in rows if r.errors]
         if rows_with_errors:
             error_list = "\n".join([
@@ -607,119 +736,179 @@ class ExcelImportService:
 
         try:
             study = self.session.query(Study).filter(Study.id == study_id).one()
-            freezer_repo = FreezerRepository(self.session)
+
+            # ── Pre-compute starting sample serial (one MAX query) ────────────
+            import datetime as dt
+            year_short = str(dt.date.today().year)[-2:]
+            prefix = f"{study.project_id_short}-{year_short}-"
+
+            max_id = (
+                self.session.query(func.max(Sample.sample_id))
+                .filter(Sample.sample_id.like(f"{prefix}%"))
+                .scalar()
+            )
+            next_serial = 1
+            if max_id:
+                try:
+                    next_serial = int(max_id.replace(prefix, "")) + 1
+                except ValueError:
+                    pass
+
+            # ── Pre-load existing participants → {pid: participant_id} ────────
+            existing_participant_ids: dict[str, int] = {}
+            for p in (
+                self.session.query(Participant.pid, Participant.id)
+                .filter(Participant.study_id == study_id)
+                .all()
+            ):
+                existing_participant_ids[p.pid] = p.id
+
+            # ── Storage hierarchy in-memory caches ────────────────────────────
+            freezer_cache: dict     = {}
+            compartment_cache: dict = {}
+            rack_cache: dict        = {}
+            drawer_cache: dict      = {}
+            box_cache: dict         = {}
+            position_cache: dict    = {}  # (box_id, row, col) → position_id
 
             created_count = 0
+            total = len(rows)
 
-            for row in rows:
-                # 1. Get or create Participant (check if already exists for this study)
-                participant = self.session.query(Participant).filter(
-                    Participant.pid == row.pid,
-                    Participant.study_id == study_id
-                ).first()
-                
-                if not participant:
-                    participant = Participant(
-                        pid=row.pid,
-                        study_id=study_id,
-                        age=row.age,
-                        gender=row.gender,
-                        population=row.population,
-                        disease=row.disease,
-                        site_name=row.site_name,
-                        cohort_name=row.cohort_name,
-                        notes=row.discrepancy_remark,
+            for batch_start in range(0, total, IMPORT_BATCH_SIZE):
+                batch = rows[batch_start: batch_start + IMPORT_BATCH_SIZE]
+
+                # Track new participants created in this batch (pid → ORM object)
+                # so we can capture their IDs after the batch flush.
+                new_participants_in_batch: dict[str, Participant] = {}
+
+                for row in batch:
+                    # ── Participant ───────────────────────────────────────────
+                    pid = str(row.pid).strip() if row.pid else row.pid
+                    p_id = existing_participant_ids.get(pid)
+
+                    if p_id is not None:
+                        # Use integer FK — no ORM object needed
+                        participant_ref = None
+                        participant_id  = p_id
+                    else:
+                        # Check if we already staged a new participant in this batch
+                        if pid in new_participants_in_batch:
+                            participant_ref = new_participants_in_batch[pid]
+                            participant_id  = None
+                        else:
+                            participant_ref = Participant(
+                                pid=pid,
+                                study_id=study_id,
+                                age=row.age,
+                                gender=row.gender,
+                                population=row.population,
+                                disease=row.disease,
+                                site_name=row.site_name,
+                                cohort_name=row.cohort_name,
+                                notes=row.discrepancy_remark,
+                            )
+                            self.session.add(participant_ref)
+                            new_participants_in_batch[pid] = participant_ref
+                            participant_id = None
+
+                    # ── Sample ────────────────────────────────────────────────
+                    parsed_date = self._parse_date(row.date_collected)
+                    sample_id_str = f"{prefix}{next_serial}"
+                    next_serial += 1
+
+                    if participant_id is not None:
+                        sample = Sample(
+                            sample_id=sample_id_str,
+                            participant_id=participant_id,
+                            study_id=study_id,
+                            sample_type=row.sample_type,
+                            visit_time=row.visit_time,
+                            collection_date=parsed_date,
+                            visit_code=row.visit_code,
+                            visit_name=row.visit_name,
+                        )
+                    else:
+                        # Link via ORM relationship — SQLAlchemy resolves FK on flush
+                        sample = Sample(
+                            sample_id=sample_id_str,
+                            participant=participant_ref,
+                            study_id=study_id,
+                            sample_type=row.sample_type,
+                            visit_time=row.visit_time,
+                            collection_date=parsed_date,
+                            visit_code=row.visit_code,
+                            visit_name=row.visit_name,
+                        )
+                    self.session.add(sample)
+
+                    # ── Aliquot ───────────────────────────────────────────────
+                    aliquot_id_str = generate_aliquot_id(sample_id_str, 1)
+                    aliquot = SampleAliquot(
+                        aliquot_id=aliquot_id_str,
+                        sample=sample,          # relationship — resolved on flush
+                        aliquot_number=1,
+                        discrepancy_remark=row.discrepancy_remark,
+                        discrepancy_field=row.discrepancy_for,
                     )
-                    self.session.add(participant)
-                    self.session.flush()
+                    self.session.add(aliquot)
 
-                # 2. Create Sample
-                if row.date_collected:
-                    if isinstance(row.date_collected, str):
-                        try:
-                            # Try parsing the date string to datetime object
-                            parsed_date = parse(row.date_collected)
-                        except (ParserError, ValueError, TypeError):
-                            parsed_date = None
-                    elif isinstance(row.date_collected, datetime):
-                        # Already a datetime object
-                        parsed_date = row.date_collected
-                    else:
-                        # Try to convert if it's a date object to datetime
-                        parsed_date = datetime.combine(row.date_collected, datetime.min.time()) if hasattr(row.date_collected, 'date') else None
-                else:
-                    parsed_date = None
-                
-                sample_id_str = generate_sample_id(self.session, study)
-                sample = Sample(
-                    sample_id=sample_id_str,
-                    participant_id=participant.id,
-                    study_id=study_id,
-                    sample_type=row.sample_type,
-                    visit_time=row.visit_time,
-                    collection_date=parsed_date,
-                    visit_code=row.visit_code,
-                    visit_name=row.visit_name,
-                )
-                self.session.add(sample)
+                    # ── Storage location ──────────────────────────────────────
+                    if row.freezer_name:
+                        result = self._get_box_cached(
+                            row,
+                            freezer_cache, compartment_cache,
+                            rack_cache, drawer_cache,
+                            box_cache, position_cache,
+                        )
+                        if result and row.position:
+                            box, compartment_name, rack_name, drawer_name = result
+                            grid_row, grid_col = self._position_to_row_col(row.position)
+                            if grid_row is not None:
+                                pos_id = position_cache.get((box.id, grid_row, grid_col))
+                                if pos_id:
+                                    location = AliquotLocation(
+                                        aliquot=aliquot,    # relationship — resolved on flush
+                                        position_id=pos_id,
+                                        freezer_name=row.freezer_name,
+                                        compartment_name=compartment_name,
+                                        rack_name=rack_name,
+                                        drawer_name=drawer_name,
+                                        box_name=row.container_name,
+                                    )
+                                    self.session.add(location)
+
+                    created_count += 1
+
+                # ── Batch flush: SQLAlchemy resolves FK ordering automatically ─
                 self.session.flush()
 
-                # 3. Always create SampleAliquot (storage location is optional)
-                aliquot_id_str = generate_aliquot_id(sample_id_str, 1)
-                aliquot = SampleAliquot(
-                    aliquot_id=aliquot_id_str,
-                    sample_id=sample.id,
-                    aliquot_number=1,
-                )
-                self.session.add(aliquot)
-                self.session.flush()
+                # Capture IDs of newly created participants before commit
+                for pid, p_obj in new_participants_in_batch.items():
+                    existing_participant_ids[pid] = p_obj.id
 
-                # 4. Set storage location if provided
-                if row.freezer_name:
-                    is_cylindrical = not row.shelf_name
-                    if is_cylindrical:
-                        freezer, container, shelf, rack, box = \
-                            self._get_or_create_storage_hierarchy_cylindrical(
-                                row.freezer_name, row.container_name,
-                                row.rack_drawer_combined
-                            )
-                    else:
-                        freezer, container, shelf, rack, box = \
-                            self._get_or_create_storage_hierarchy(
-                                row.freezer_name, row.container_name,
-                                row.shelf_name, row.rack_drawer_combined
-                            )
+                self.session.commit()
 
-                    # Place the aliquot in the box grid
-                    if row.position:
-                        grid_row, grid_col = self._position_to_row_col(row.position)
-                        
-                        if grid_row is not None and grid_col is not None:
-                            # Get the BoxPosition
-                            position = self.session.query(BoxPosition).filter(
-                                BoxPosition.box_id == box.id,
-                                BoxPosition.row == grid_row,
-                                BoxPosition.col == grid_col,
-                            ).first()
-                            
-                            if position:
-                                # Create AliquotLocation linking aliquot to position
-                                location = AliquotLocation(
-                                    aliquot_id=aliquot.id,
-                                    position_id=position.id,
-                                    freezer_name=freezer.name,
-                                    compartment_name=container.name,
-                                    rack_name=shelf.name,
-                                    drawer_name=rack.name,
-                                    box_name=box.name,
-                                )
-                                self.session.add(location)
+                if progress_callback:
+                    progress_callback(min(batch_start + IMPORT_BATCH_SIZE, total), total)
 
-                created_count += 1
-
-            self.session.commit()
             return created_count, None
 
         except Exception as e:
             self.session.rollback()
             return 0, f"Import failed: {str(e)}"
+
+    @staticmethod
+    def _parse_date(date_collected) -> Optional[datetime]:
+        """Parse date_collected field to datetime, or None."""
+        if not date_collected:
+            return None
+        if isinstance(date_collected, str):
+            try:
+                return parse(date_collected)
+            except (ParserError, ValueError, TypeError):
+                return None
+        if isinstance(date_collected, datetime):
+            return date_collected
+        if hasattr(date_collected, 'date'):
+            return datetime.combine(date_collected, datetime.min.time())
+        return None

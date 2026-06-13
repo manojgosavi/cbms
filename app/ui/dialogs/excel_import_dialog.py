@@ -10,14 +10,16 @@ Imports participant/sample/aliquot data from Excel with 21 columns:
 PyQt6 concepts:
   - QFileDialog.getOpenFileName() : native OS file picker
   - QTableWidget                  : displays validation errors row by row
+  - QThread / pyqtSignal          : runs import in background to keep UI responsive
 """
 
 from __future__ import annotations
 
+from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtWidgets import (
     QComboBox, QDialog, QDialogButtonBox, QFileDialog,
     QHBoxLayout, QLabel, QLineEdit, QMessageBox,
-    QPushButton, QTableWidget, QTableWidgetItem,
+    QPushButton, QProgressBar, QTableWidget, QTableWidgetItem,
     QVBoxLayout, QScrollArea, QWidget,
 )
 from PyQt6.QtGui import QFont
@@ -25,6 +27,28 @@ from PyQt6.QtGui import QFont
 from app.core.models.database import get_session
 from app.core.services.excel_import_service import ExcelImportService
 from app.core.services.study_service import StudyService
+
+
+class _ImportWorker(QThread):
+    """Background thread that runs the actual DB import and emits progress."""
+
+    progress = pyqtSignal(int, int)   # (processed, total)
+    finished = pyqtSignal(int, str)   # (count_created, error_msg_or_empty)
+
+    def __init__(self, rows, study_id: int, parent=None):
+        super().__init__(parent)
+        self._rows = rows
+        self._study_id = study_id
+
+    def run(self):
+        with get_session() as session:
+            service = ExcelImportService(session)
+            count, error = service.import_rows(
+                self._rows,
+                self._study_id,
+                progress_callback=lambda done, total: self.progress.emit(done, total),
+            )
+        self.finished.emit(count, error or "")
 
 
 class ExcelImportDialog(QDialog):
@@ -35,7 +59,8 @@ class ExcelImportDialog(QDialog):
         self.setWindowTitle("Bulk Import from Excel")
         self.setMinimumWidth(700)
         self.setMinimumHeight(500)
-        self.excel_service = None
+        self._worker = None
+        self._validated_rows = None
         self._build_ui()
         self._load_studies()
 
@@ -83,10 +108,18 @@ class ExcelImportDialog(QDialog):
         file_row.addWidget(btn_browse)
         layout.addLayout(file_row)
 
-        # Validation / result display
+        # Status label
         self._status = QLabel("")
         self._status.setWordWrap(True)
         layout.addWidget(self._status)
+
+        # Progress bar (hidden until import starts)
+        self._progress_bar = QProgressBar()
+        self._progress_bar.setRange(0, 100)
+        self._progress_bar.setValue(0)
+        self._progress_bar.setTextVisible(True)
+        self._progress_bar.hide()
+        layout.addWidget(self._progress_bar)
 
         # Error table (scrollable)
         scroll_area = QScrollArea()
@@ -106,15 +139,15 @@ class ExcelImportDialog(QDialog):
         layout.addWidget(scroll_area)
 
         # Buttons
-        buttons = QDialogButtonBox(
+        self._buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok |
             QDialogButtonBox.StandardButton.Cancel
         )
-        import_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
-        import_btn.setText("Import")
-        import_btn.clicked.connect(self._on_import)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        self._import_btn = self._buttons.button(QDialogButtonBox.StandardButton.Ok)
+        self._import_btn.setText("Import")
+        self._import_btn.clicked.connect(self._on_import)
+        self._buttons.rejected.connect(self._on_cancel)
+        layout.addWidget(self._buttons)
 
     def _load_studies(self):
         """Load active studies into combo box."""
@@ -131,82 +164,107 @@ class ExcelImportDialog(QDialog):
         )
         if path:
             self._file_path.setText(path)
+            self._validated_rows = None  # reset cached validation on new file
+            self._error_table.hide()
+            self._status.setText("")
+
+    def _on_cancel(self):
+        """Cancel or stop running import."""
+        if self._worker and self._worker.isRunning():
+            self._worker.terminate()
+            self._worker.wait()
+            self._status.setText("Import cancelled.")
+            self._set_ui_busy(False)
+        else:
+            self.reject()
 
     def _on_import(self):
         """Validate and import rows from Excel."""
         path = self._file_path.text().strip()
         if not path:
-            self._status.setText("⚠ Please select a file.")
+            self._status.setText("Please select a file.")
             self._error_table.hide()
             return
 
         study_id = self._study_combo.currentData()
         if not study_id:
-            self._status.setText("⚠ Please select a study.")
+            self._status.setText("Please select a study.")
             self._error_table.hide()
             return
 
+        # ── Validate (runs on UI thread; fast since it's pure Python + one file read) ──
         self._status.setText("Loading and validating Excel file…")
         self._error_table.hide()
+        self._progress_bar.hide()
 
-        # Load and validate
         with get_session() as session:
             excel_service = ExcelImportService(session)
             rows, header_errors = excel_service.load_and_validate_excel(path)
 
-        # Check for header errors
         if header_errors:
-            error_msg = "\n".join(header_errors)
-            self._status.setText(f"❌ File Error:\n{error_msg}")
-            self._error_table.hide()
+            self._status.setText(f"File Error:\n{chr(10).join(header_errors)}")
             return
 
-        # Check for validation errors
         rows_with_errors = [r for r in rows if r.errors]
-
         if rows_with_errors:
-            error_count = len(rows_with_errors)
             self._status.setText(
-                f"⚠ Validation failed: {error_count} row(s) have errors. "
-                f"Fix the Excel file and try again."
+                f"Validation failed: {len(rows_with_errors)} row(s) have errors. "
+                "Fix the Excel file and try again."
             )
-            
-            # Show error table
             self._error_table.setRowCount(len(rows_with_errors))
             for i, row in enumerate(rows_with_errors):
-                row_item = QTableWidgetItem(str(row.row_num))
-                error_msg = "; ".join(row.errors)
-                error_item = QTableWidgetItem(error_msg)
-                self._error_table.setItem(i, 0, row_item)
-                self._error_table.setItem(i, 1, error_item)
+                self._error_table.setItem(i, 0, QTableWidgetItem(str(row.row_num)))
+                self._error_table.setItem(i, 1, QTableWidgetItem("; ".join(row.errors)))
             self._error_table.show()
             return
 
-        # All rows valid - ask for confirmation
+        # ── Confirm ────────────────────────────────────────────────────────────
         row_count = len(rows)
         reply = QMessageBox.question(
             self,
             "Confirm Import",
-            f"Ready to import {row_count} row(s). Continue?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            f"Ready to import {row_count:,} row(s). Continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
-
         if reply != QMessageBox.StandardButton.Yes:
             self._status.setText("Import cancelled.")
             return
 
-        # Import
-        self._status.setText("Importing data…")
-        with get_session() as session:
-            excel_service = ExcelImportService(session)
-            created_count, error_msg = excel_service.import_rows(rows, study_id)
+        # ── Run import in background thread ────────────────────────────────────
+        self._set_ui_busy(True)
+        self._progress_bar.setRange(0, row_count)
+        self._progress_bar.setValue(0)
+        self._progress_bar.setFormat(f"0 / {row_count:,} rows")
+        self._progress_bar.show()
+        self._status.setText(f"Importing {row_count:,} rows…")
+
+        self._worker = _ImportWorker(rows, study_id, parent=self)
+        self._worker.progress.connect(self._on_progress)
+        self._worker.finished.connect(self._on_import_finished)
+        self._worker.start()
+
+    def _on_progress(self, done: int, total: int):
+        """Update progress bar from worker thread signal."""
+        self._progress_bar.setValue(done)
+        self._progress_bar.setFormat(f"{done:,} / {total:,} rows")
+
+    def _on_import_finished(self, count: int, error_msg: str):
+        """Handle worker completion."""
+        self._set_ui_busy(False)
+        self._progress_bar.hide()
 
         if error_msg:
-            self._status.setText(f"❌ Import Failed:\n{error_msg}")
+            self._status.setText(f"Import Failed:\n{error_msg}")
+        else:
+            self._status.setText(f"Import successful! {count:,} row(s) imported.")
             self._error_table.hide()
-            return
+            self.accept()
 
-        self._status.setText(f"✓ Import successful! {created_count} row(s) imported.")
-        self._error_table.hide()
-        self.accept()
-
+    def _set_ui_busy(self, busy: bool):
+        """Enable/disable controls while import is running."""
+        self._import_btn.setEnabled(not busy)
+        self._study_combo.setEnabled(not busy)
+        self._file_path.setEnabled(not busy)
+        cancel_btn = self._buttons.button(QDialogButtonBox.StandardButton.Cancel)
+        if cancel_btn:
+            cancel_btn.setText("Stop" if busy else "Cancel")

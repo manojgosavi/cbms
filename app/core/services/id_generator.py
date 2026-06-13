@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import datetime as dt
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.models.models import Sample, SampleAliquot, Study
@@ -21,31 +22,25 @@ def generate_sample_id(session: Session, study: Study) -> str:
     """
     Generate the next Sample ID for a study in the current year.
 
-    Steps:
-    1. Find the highest serial already used for (study × year).
-    2. Increment by 1.
-    3. Return formatted ID.
+    Uses func.max() to find the highest serial in one query (O(1)).
     """
-    year_short = str(dt.date.today().year)[-2:]       # "26"
+    year_short = str(dt.date.today().year)[-2:]
     prefix = f"{study.project_id_short}-{year_short}-"
 
-    # Find the current max serial for this prefix
-    existing: list[Sample] = (
-        session.query(Sample)
+    max_id = (
+        session.query(func.max(Sample.sample_id))
         .filter(Sample.sample_id.like(f"{prefix}%"))
-        .all()
+        .scalar()
     )
 
     max_serial = 0
-    for s in existing:
+    if max_id:
         try:
-            serial = int(s.sample_id.replace(prefix, ""))
-            max_serial = max(max_serial, serial)
+            max_serial = int(max_id.replace(prefix, ""))
         except ValueError:
             pass
 
-    next_serial = max_serial + 1
-    return f"{prefix}{next_serial}"
+    return f"{prefix}{max_serial + 1}"
 
 
 def generate_aliquot_id(sample_id: str, aliquot_number: int) -> str:
