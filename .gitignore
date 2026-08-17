@@ -24,3 +24,6 @@ dist/
 # Backup files
 *.backup
 config.py.backup
+./build/*
+./data/*
+./dist/*

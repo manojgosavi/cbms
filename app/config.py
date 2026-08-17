@@ -5,27 +5,40 @@ Global configuration and constants.
 
 from pathlib import Path
 from enum import Enum
+import platform
 import sys
 
 # ── Paths ──────────────────────────────────────────────────────────────────
 # For development: __file__ points to config.py in app/
-# For PyInstaller bundle: __file__ points to config.pyc in the bundle
-BASE_DIR = Path(__file__).resolve().parent.parent          # project root or app directory
+# For PyInstaller bundle: __file__ points to config.pyc inside the bundle
+BASE_DIR = Path(__file__).resolve().parent.parent          # project root or bundle dir
 
-# For bundled apps, ensure data folder is in a writable location
-# Try to create data in BASE_DIR first, fall back to user home if not writable
 def _get_data_dir() -> Path:
+    # When frozen by PyInstaller the DB must live OUTSIDE the bundle —
+    # otherwise every fresh copy of the .app starts with an empty database
+    # and any data written is lost when the bundle is replaced.
+    if getattr(sys, 'frozen', False):
+        system = platform.system()
+        if system == 'Darwin':
+            data_dir = Path.home() / 'Library' / 'Application Support' / 'CBMS'
+        elif system == 'Windows':
+            import os
+            appdata = os.environ.get('APPDATA') or str(Path.home())
+            data_dir = Path(appdata) / 'CBMS'
+        else:
+            data_dir = Path.home() / '.local' / 'share' / 'CBMS'
+        data_dir.mkdir(parents=True, exist_ok=True)
+        return data_dir
+
+    # Development / source mode — use project data/ folder with writable fallback
     preferred = BASE_DIR / "data"
-    # Check if BASE_DIR is writable
     try:
         preferred.mkdir(parents=True, exist_ok=True)
-        # Test if we can actually write to it
         test_file = preferred / ".write_test"
         test_file.touch()
         test_file.unlink()
         return preferred
     except (OSError, PermissionError):
-        # Fall back to user home directory
         home_data = Path.home() / ".cbms" / "data"
         home_data.mkdir(parents=True, exist_ok=True)
         return home_data
